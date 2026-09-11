@@ -1355,12 +1355,12 @@ def make_minuit_for_event(obs_pes, obs_ts, start_params, mpmt_types=None, fixed_
     m.errors["t0"] = 0.1
 
     if IS_ABSORPTION_MODE:
-        m.limits["visible_length"] = (0.0, max_range)
+        m.limits["visible_length"] = (1.0, max_range)
         m.limits["full_range"] = (1.0, max_range)
         m.errors["visible_length"] = 60.0
         m.errors["full_range"] = 100.0
     else:
-        m.limits["length"] = (0.0, max_range)
+        m.limits["length"] = (1.0, max_range)
         m.errors["length"] = 60.0
 
     if not USE_TIMING_LIKELIHOOD:

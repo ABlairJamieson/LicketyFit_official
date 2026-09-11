@@ -63,6 +63,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--fixed-z-mm", type=float, default=-1348.0)
     parser.add_argument(
+        "--z-seeds-mm",
+        type=parse_float_list,
+        default=None,
+        help="Initial z0 seeds used when --free-z is enabled.",
+    )
+    parser.add_argument(
         "--free-z",
         action="store_true",
         help="Float z0 instead of fixing it to --fixed-z-mm.",
@@ -289,9 +295,9 @@ def main() -> int:
     if truth:
         print_mapping("AVAILABLE SIMULATION TRUTH", truth)
 
-    fixed_params: dict[str, float | None] = {}
-    if not args.free_z:
-        fixed_params["z0"] = float(args.fixed_z_mm)
+    fixed_params: dict[str, float | None] = {
+        "z0": None if args.free_z else float(args.fixed_z_mm)
+    }
     if args.fit_mode == "absorption":
         fixed_params["ke0_mev"] = (
             None if args.free_energy else float(args.energy_mev)
@@ -314,7 +320,9 @@ def main() -> int:
         fast_seed_x0=args.x_seeds_mm,
         fast_seed_y0=args.y_seeds_mm,
         fast_seed_z0=(
-            [args.fixed_z_mm] if not args.free_z else [-1500.0, -1300.0, -1100.0]
+            [args.fixed_z_mm]
+            if not args.free_z
+            else (args.z_seeds_mm or [-1500.0, -1300.0, -1100.0])
         ),
         fast_seed_visible_lengths=args.visible_length_seeds_mm,
         fast_seed_ke0_mev=args.ke_seeds_mev,
