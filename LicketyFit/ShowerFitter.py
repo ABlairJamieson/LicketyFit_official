@@ -49,7 +49,9 @@ class ShowerFitConfig:
     refractive_index: float = 1.344
     vacuum_light_speed_mm_per_ns: float = 299.792458
     cherenkov_angle_deg: float = 41.8
-    angular_width_bounds_deg: tuple[float, float] = (2.0, 35.0)
+    # Gaussian sigma about the fixed Cherenkov opening angle, not the opening
+    # angle itself. A generous upper bound makes model inadequacy visible.
+    angular_width_bounds_deg: tuple[float, float] = (2.0, 60.0)
     isotropic_fraction: float = 0.01
     distance_power: float = 2.0
     # These defaults match the current LicketyFit PMT timing likelihood so NLL
@@ -490,6 +492,19 @@ class ShowerFitter:
             ),
             "shower_direction": direction,
             "angular_width_deg": float(values["width_deg"]),
+            "ring_angular_sigma_deg": float(values["width_deg"]),
+            "angular_width_at_limit": bool(
+                np.isclose(
+                    values["width_deg"],
+                    self.config.angular_width_bounds_deg[0],
+                    atol=1.0e-4,
+                )
+                or np.isclose(
+                    values["width_deg"],
+                    self.config.angular_width_bounds_deg[1],
+                    atol=1.0e-4,
+                )
+            ),
             "total_detected_pe": float(values["total_detected_pe"]),
             "metadata": {
                 "hypothesis": "empirical_one_point_shower_cone",

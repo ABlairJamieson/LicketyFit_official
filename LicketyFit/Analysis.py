@@ -531,7 +531,7 @@ def _fit_parameter_count(fit: Mapping[str, Any]) -> int:
 def compare_fit_hypotheses(
     track_fit: Mapping[str, Any],
     shower_fit: Mapping[str, Any],
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Return track-vs-shower likelihood, AIC, and BIC comparison features.
 
     Positive ``track_over_shower_*`` values favour the track hypothesis.  The
@@ -569,12 +569,42 @@ def compare_fit_hypotheses(
     k_shower = _fit_parameter_count(shower_fit)
     n = max(1, track_obs.size)
 
+    track_valid = bool(track_fit.get("valid", False))
+    shower_valid = bool(shower_fit.get("valid", False))
+    if not (
+        track_valid
+        and shower_valid
+        and np.isfinite(track_nll)
+        and np.isfinite(shower_nll)
+    ):
+        failed = []
+        if not track_valid or not np.isfinite(track_nll):
+            failed.append("track")
+        if not shower_valid or not np.isfinite(shower_nll):
+            failed.append("shower")
+        return {
+            "comparison_valid": False,
+            "comparison_reason": (
+                f"Invalid or non-finite {' and '.join(failed)} fit; "
+                "no classification score reported."
+            ),
+            "track_over_shower_2delta_log_likelihood": float("nan"),
+            "track_over_shower_delta_aic": float("nan"),
+            "track_over_shower_delta_bic": float("nan"),
+            "track_nll": track_nll,
+            "shower_nll": shower_nll,
+            "track_n_parameters": float(k_track),
+            "shower_n_parameters": float(k_shower),
+        }
+
     track_aic = 2.0 * k_track + 2.0 * track_nll
     shower_aic = 2.0 * k_shower + 2.0 * shower_nll
     track_bic = np.log(n) * k_track + 2.0 * track_nll
     shower_bic = np.log(n) * k_shower + 2.0 * shower_nll
 
     return {
+        "comparison_valid": True,
+        "comparison_reason": "Both optimizations are valid; verify common likelihood conventions before physics use.",
         "track_over_shower_2delta_log_likelihood": 2.0 * (shower_nll - track_nll),
         "track_over_shower_delta_aic": shower_aic - track_aic,
         "track_over_shower_delta_bic": shower_bic - track_bic,

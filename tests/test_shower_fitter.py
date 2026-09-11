@@ -34,6 +34,10 @@ class ShowerModelTests(unittest.TestCase):
         expected_time = 3.0 + 1500.0 / (299.792458 / 1.344)
         self.assertTrue(np.allclose(times, expected_time))
 
+    def test_default_width_bound_is_not_the_cherenkov_angle(self):
+        self.assertAlmostEqual(self.model.config.cherenkov_angle_deg, 41.8)
+        self.assertGreater(self.model.config.angular_width_bounds_deg[1], 41.8)
+
     def test_true_direction_beats_opposite_direction(self):
         expected, times = self.model.predict(
             (0.0, 0.0, 0.0),

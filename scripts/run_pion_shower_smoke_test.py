@@ -125,6 +125,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--shower-ncall", type=int, default=5000)
     parser.add_argument(
+        "--shower-width-max-deg",
+        type=float,
+        default=60.0,
+        help="Upper bound on Gaussian ring-width sigma (not the Cherenkov angle).",
+    )
+    parser.add_argument(
+        "--shower-vertex-half-width-mm",
+        type=float,
+        default=1500.0,
+        help="Allowed displacement in each coordinate from the shower vertex seed.",
+    )
+    parser.add_argument(
         "--shower-seed",
         choices=("prompt", "track"),
         default="prompt",
@@ -372,6 +384,14 @@ def main() -> int:
         )
     }
     features = topology_features(track, beam_direction=(0.0, 0.0, 1.0))
+    if args.likelihood_mode == "charge_only":
+        for name in (
+            "fit_n_timing_residual_pmts",
+            "fit_timing_residual_mean_ns",
+            "fit_timing_residual_rms_ns",
+            "fit_timing_pull_rms",
+        ):
+            features[name] = float("nan")
 
     print_mapping("TRACK FIT SUMMARY", summary)
     print_mapping("MINUIT DIAGNOSTICS", diagnostics)
@@ -394,7 +414,12 @@ def main() -> int:
             pmt_direction_zs=track["direction_zs"],
             config=ShowerFitConfig(
                 ncall=args.shower_ncall,
-                vertex_half_width_mm=(300.0, 300.0, 300.0),
+                vertex_half_width_mm=(
+                    args.shower_vertex_half_width_mm,
+                    args.shower_vertex_half_width_mm,
+                    args.shower_vertex_half_width_mm,
+                ),
+                angular_width_bounds_deg=(2.0, args.shower_width_max_deg),
                 include_timing=args.likelihood_mode == "charge_time",
             ),
         )
@@ -434,6 +459,9 @@ def main() -> int:
             "effective_vertex_mm": shower["effective_vertex_mm"],
             "direction": shower["shower_direction"],
             "angular_width_deg": shower["angular_width_deg"],
+            "ring_angular_sigma_deg": shower["ring_angular_sigma_deg"],
+            "cherenkov_angle_deg": shower["metadata"]["cherenkov_angle_deg"],
+            "angular_width_at_limit": shower["angular_width_at_limit"],
             "total_detected_pe": shower["total_detected_pe"],
         }
         comparison = compare_fit_hypotheses(track, shower)

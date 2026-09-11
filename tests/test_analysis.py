@@ -65,15 +65,27 @@ class EventFeatureTests(unittest.TestCase):
             "obs_pes": observed,
             "fval": 10.0,
             "n_parameters": 7,
+            "valid": True,
         }
         shower = {
             "obs_pes": observed.copy(),
             "fval": 15.0,
             "n_parameters": 8,
+            "valid": True,
         }
         comparison = compare_fit_hypotheses(track, shower)
         self.assertEqual(comparison["track_over_shower_2delta_log_likelihood"], 10.0)
         self.assertGreater(comparison["track_over_shower_delta_aic"], 0.0)
+
+    def test_invalid_fit_suppresses_comparison(self):
+        observed = np.asarray([0.0, 1.0, 2.0])
+        comparison = compare_fit_hypotheses(
+            {"obs_pes": observed, "fval": 10.0, "valid": False},
+            {"obs_pes": observed.copy(), "fval": 15.0, "valid": True},
+        )
+        self.assertFalse(comparison["comparison_valid"])
+        self.assertTrue(np.isnan(comparison["track_over_shower_2delta_log_likelihood"]))
+        self.assertIn("track", comparison["comparison_reason"])
 
     def test_negative_charge_rejected(self):
         with self.assertRaises(ValueError):
