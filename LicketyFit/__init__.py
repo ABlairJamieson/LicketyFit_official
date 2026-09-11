@@ -1,5 +1,18 @@
-"""LicketyFit particle-track reconstruction package."""
+"""LicketyFit particle-aware fitting and topology-analysis package."""
 
-__version__ = "1.45.1"
+from .Analysis import (
+    FeatureConfig,
+    compare_fit_hypotheses,
+    extract_event_features,
+    features_from_fit_output,
+)
+from .ShowerFitter import ShowerFitConfig, ShowerFitter
 
-__all__ = ["__version__"]
+__all__ = [
+    "FeatureConfig",
+    "ShowerFitConfig",
+    "ShowerFitter",
+    "compare_fit_hypotheses",
+    "extract_event_features",
+    "features_from_fit_output",
+]
