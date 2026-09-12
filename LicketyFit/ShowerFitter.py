@@ -52,6 +52,10 @@ class ShowerFitConfig:
     # Gaussian sigma about the fixed Cherenkov opening angle, not the opening
     # angle itself. A generous upper bound makes model inadequacy visible.
     angular_width_bounds_deg: tuple[float, float] = (2.0, 60.0)
+    # Bounds on the shower-axis polar angle measured from +z.  The library
+    # default remains unconstrained; tagged-gamma analyses can impose a
+    # forward cone around the known beam direction.
+    direction_theta_bounds_deg: tuple[float, float] = (0.0, 180.0)
     isotropic_fraction: float = 0.01
     distance_power: float = 2.0
     # These defaults match the current LicketyFit PMT timing likelihood so NLL
@@ -436,7 +440,18 @@ class ShowerFitter:
                 float(vertex_seed[index] + half_width[index]),
             )
             minimizer.errors[name] = max(5.0, 0.05 * half_width[index])
-        minimizer.limits["theta"] = (0.0, np.pi)
+        theta_bounds = np.radians(self.config.direction_theta_bounds_deg)
+        if (
+            theta_bounds.shape != (2,)
+            or np.any(~np.isfinite(theta_bounds))
+            or theta_bounds[0] < 0.0
+            or theta_bounds[1] > np.pi
+            or theta_bounds[0] >= theta_bounds[1]
+        ):
+            raise ValueError(
+                "direction_theta_bounds_deg must be increasing bounds within [0, 180]."
+            )
+        minimizer.limits["theta"] = tuple(float(value) for value in theta_bounds)
         minimizer.limits["phi"] = (-np.pi, np.pi)
         minimizer.limits["width_deg"] = tuple(self.config.angular_width_bounds_deg)
         minimizer.limits["total_detected_pe"] = (max(1.0e-6, 0.05 * total_seed), 20.0 * total_seed)
@@ -517,6 +532,9 @@ class ShowerFitter:
                     name for name in self.parameter_names if not bool(minimizer.fixed[name])
                 ],
                 "cherenkov_angle_deg": float(self.config.cherenkov_angle_deg),
+                "direction_theta_bounds_deg": tuple(
+                    float(value) for value in self.config.direction_theta_bounds_deg
+                ),
                 "warning": (
                     "Effective one-point shower model; vertex and width are empirical. "
                     "Energy requires external PE/MeV calibration."

@@ -152,6 +152,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Upper bound on Gaussian ring-width sigma (not the Cherenkov angle).",
     )
     parser.add_argument(
+        "--shower-max-beam-angle-deg",
+        type=float,
+        default=30.0,
+        help=(
+            "Constrain the shower axis within this angle of the +z tagged-gamma "
+            "beam. The pion direction remains unrestricted."
+        ),
+    )
+    parser.add_argument(
         "--shower-vertex-half-width-mm",
         type=float,
         default=1500.0,
@@ -445,6 +454,7 @@ def main() -> int:
                     args.shower_vertex_half_width_mm,
                 ),
                 angular_width_bounds_deg=(2.0, args.shower_width_max_deg),
+                direction_theta_bounds_deg=(0.0, args.shower_max_beam_angle_deg),
                 include_timing=args.likelihood_mode == "charge_time",
             ),
         )
@@ -475,7 +485,7 @@ def main() -> int:
             track["obs_pes"],
             track["obs_ts"],
             vertex_seed_mm=shower_vertex_seed,
-            direction_seed=track["track_direction"],
+            direction_seed=(0.0, 0.0, 1.0),
             width_seed_deg=10.0,
         )
         shower_summary = {
@@ -486,6 +496,7 @@ def main() -> int:
             "angular_width_deg": shower["angular_width_deg"],
             "ring_angular_sigma_deg": shower["ring_angular_sigma_deg"],
             "cherenkov_angle_deg": shower["metadata"]["cherenkov_angle_deg"],
+            "max_beam_angle_deg": args.shower_max_beam_angle_deg,
             "angular_width_at_limit": shower["angular_width_at_limit"],
             "total_detected_pe": shower["total_detected_pe"],
         }

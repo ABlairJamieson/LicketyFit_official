@@ -38,6 +38,10 @@ class ShowerModelTests(unittest.TestCase):
         self.assertAlmostEqual(self.model.config.cherenkov_angle_deg, 41.8)
         self.assertGreater(self.model.config.angular_width_bounds_deg[1], 41.8)
 
+    def test_forward_axis_constraint(self):
+        config = ShowerFitConfig(direction_theta_bounds_deg=(0.0, 20.0))
+        self.assertEqual(config.direction_theta_bounds_deg, (0.0, 20.0))
+
     def test_true_direction_beats_opposite_direction(self):
         expected, times = self.model.predict(
             (0.0, 0.0, 0.0),
