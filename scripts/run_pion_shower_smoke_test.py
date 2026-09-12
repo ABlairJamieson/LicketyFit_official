@@ -36,6 +36,21 @@ def parse_float_list(text: str) -> list[float]:
     return values
 
 
+def isotropic_direction_seeds() -> list[tuple[float, float]]:
+    """Return direction-cosine seeds spanning one z hemisphere."""
+
+    seeds = [(0.0, 0.0)]
+    for transverse in (0.45, 0.75, 0.92):
+        for phi in np.linspace(0.0, 2.0 * np.pi, 16, endpoint=False):
+            seeds.append(
+                (
+                    float(transverse * np.cos(phi)),
+                    float(transverse * np.sin(phi)),
+                )
+            )
+    return seeds
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -89,6 +104,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--both-directions",
         action="store_true",
         help="Fit both cz hemispheres and retain the lower-NLL result.",
+    )
+    parser.add_argument(
+        "--direction-seeding",
+        choices=("beam", "isotropic"),
+        default="beam",
+        help="Use near-beam seeds or seeds spanning each fitted z hemisphere.",
     )
 
     parser.add_argument("--ncall", type=int, default=15000)
@@ -338,13 +359,17 @@ def main() -> int:
         ),
         fast_seed_visible_lengths=args.visible_length_seeds_mm,
         fast_seed_ke0_mev=args.ke_seeds_mev,
-        fast_seed_directions=[
-            (0.0, 0.0),
-            (0.04, 0.0),
-            (-0.04, 0.0),
-            (0.0, 0.04),
-            (0.0, -0.04),
-        ],
+        fast_seed_directions=(
+            isotropic_direction_seeds()
+            if args.direction_seeding == "isotropic"
+            else [
+                (0.0, 0.0),
+                (0.04, 0.0),
+                (-0.04, 0.0),
+                (0.0, 0.04),
+                (0.0, -0.04),
+            ]
+        ),
         fast_seed_full_cartesian=False,
         max_fit_attempts=args.max_attempts,
         ncall_migrad=args.ncall,

@@ -1300,8 +1300,10 @@ def make_minuit_for_event(obs_pes, obs_ts, start_params, mpmt_types=None, fixed_
     m.limits["x0"] = (-2000, 2000)
     m.limits["y0"] = (-2000, 2000)
     m.limits["z0"] = (-2000, 2000)
-    m.limits["cx"] = (-0.5, 0.5)
-    m.limits["cy"] = (-0.5, 0.5)
+    # Direction cosines may approach one for tracks far from the z axis.
+    # The likelihood separately rejects cx**2 + cy**2 >= 1.
+    m.limits["cx"] = (-0.999, 0.999)
+    m.limits["cy"] = (-0.999, 0.999)
     m.limits["t0"] = T0_LIMITS
 
     m.errors["x0"] = 30.0
