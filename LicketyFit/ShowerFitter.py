@@ -1,11 +1,9 @@
-"""A lightweight empirical electromagnetic-shower cone hypothesis.
+"""Deterministic electromagnetic-shower Cherenkov hypotheses.
 
-This is a baseline comparison model, not a complete electromagnetic cascade
-simulation.  It represents a shower as a fuzzy Cherenkov ring emitted from one
-effective point.  The fitted point and width are therefore *effective*
-reconstruction quantities.  The detected-PE normalization becomes an energy
-estimate only after calibration against detector simulation or data control
-samples.
+The default longitudinal model integrates fuzzy Cherenkov emission over a
+PDG-inspired gamma-profile cascade.  A legacy one-point model remains available
+for comparisons.  Neither is a substitute for full detector simulation; shape
+parameters should ultimately be calibrated against WCSim.
 """
 
 from __future__ import annotations
@@ -49,6 +47,12 @@ class ShowerFitConfig:
     refractive_index: float = 1.344
     vacuum_light_speed_mm_per_ns: float = 299.792458
     cherenkov_angle_deg: float = 41.8
+    emission_model: str = "pdg_longitudinal"
+    profile_energy_mev: float = 400.0
+    radiation_length_mm: float = 360.8
+    critical_energy_mev: float = 78.33
+    longitudinal_b: float = 0.5
+    longitudinal_slices: int = 16
     # Gaussian sigma about the fixed Cherenkov opening angle, not the opening
     # angle itself. A generous upper bound makes model inadequacy visible.
     angular_width_bounds_deg: tuple[float, float] = (2.0, 60.0)
@@ -80,7 +84,7 @@ class ShowerFitConfig:
 
 
 class ShowerFitter:
-    """Fit a one-point fuzzy-cone shower hypothesis to PMT charge and time."""
+    """Fit a deterministic fuzzy-cone EM-shower hypothesis to PMT data."""
 
     parameter_names = (
         "x0",
@@ -132,6 +136,48 @@ class ShowerFitter:
                 raise ValueError("relative_efficiency must be finite, non-negative, and length n_pmts.")
             self.relative_efficiency = efficiency
 
+        if self.config.emission_model not in {"point", "pdg_longitudinal"}:
+            raise ValueError("emission_model must be 'point' or 'pdg_longitudinal'.")
+        if self.config.profile_energy_mev <= 0.0:
+            raise ValueError("profile_energy_mev must be positive.")
+        if self.config.radiation_length_mm <= 0.0:
+            raise ValueError("radiation_length_mm must be positive.")
+        if self.config.critical_energy_mev <= 0.0:
+            raise ValueError("critical_energy_mev must be positive.")
+        if self.config.longitudinal_b <= 0.0:
+            raise ValueError("longitudinal_b must be positive.")
+        if self.config.longitudinal_slices < 2:
+            raise ValueError("longitudinal_slices must be at least 2.")
+
+    def longitudinal_profile(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return downstream emission distances and normalized slice weights.
+
+        The photon-induced shower maximum follows the PDG approximation
+        ``t_max = log(E/Ec) + 0.5`` in radiation-length units.  At WCTE
+        energies this is used as a smooth template which must be calibrated
+        with WCSim, rather than as a precision cascade prediction.
+        """
+
+        if self.config.emission_model == "point":
+            return np.asarray([0.0]), np.asarray([1.0])
+
+        energy_ratio = max(
+            float(self.config.profile_energy_mev / self.config.critical_energy_mev),
+            1.0,
+        )
+        t_max = max(0.0, float(np.log(energy_ratio) + 0.5))
+        b = float(self.config.longitudinal_b)
+        shape_a = 1.0 + b * t_max
+        # Cover the maximum and a conservative downstream tail.  Midpoint
+        # quadrature avoids the t=0 singularity when shape_a < 1.
+        t_stop = max(4.0, t_max + 6.0)
+        edges = np.linspace(0.0, t_stop, int(self.config.longitudinal_slices) + 1)
+        t = 0.5 * (edges[:-1] + edges[1:])
+        log_weight = (shape_a - 1.0) * np.log(np.clip(b * t, _EPS, None)) - b * t
+        weight = np.exp(log_weight - np.max(log_weight))
+        weight /= np.sum(weight)
+        return t * float(self.config.radiation_length_mm), weight
+
     def predict(
         self,
         vertex_mm: Sequence[float],
@@ -152,34 +198,51 @@ class ShowerFitter:
         if not np.isfinite(total_detected_pe) or total_detected_pe < 0.0:
             raise ValueError("total_detected_pe must be finite and non-negative.")
 
-        relative = self.pmt_positions_mm - vertex[None, :]
-        distance = np.linalg.norm(relative, axis=1)
-        if np.any(distance <= 0.0):
-            raise ValueError("The shower vertex cannot coincide with a PMT position.")
-        ray = relative / distance[:, None]
-
-        viewing_angle = np.arccos(np.clip(ray @ axis, -1.0, 1.0))
         ring_angle = np.radians(self.config.cherenkov_angle_deg)
         width = np.radians(float(width_deg))
-        angular = np.exp(-0.5 * ((viewing_angle - ring_angle) / width) ** 2)
-        angular += float(self.config.isotropic_fraction)
+        distances_along_axis, longitudinal_weight = self.longitudinal_profile()
+        shape = np.zeros(self.pmt_positions_mm.shape[0], dtype=np.float64)
+        time_numerator = np.zeros_like(shape)
+        for emission_distance, slice_weight in zip(
+            distances_along_axis, longitudinal_weight
+        ):
+            emission_point = vertex + emission_distance * axis
+            relative = self.pmt_positions_mm - emission_point[None, :]
+            distance = np.linalg.norm(relative, axis=1)
+            if np.any(distance <= 0.0):
+                raise ValueError("A shower emission point cannot coincide with a PMT.")
+            ray = relative / distance[:, None]
+            viewing_angle = np.arccos(np.clip(ray @ axis, -1.0, 1.0))
+            angular = np.exp(-0.5 * ((viewing_angle - ring_angle) / width) ** 2)
+            angular += float(self.config.isotropic_fraction)
 
-        distance_scale = np.median(distance)
-        geometry = (distance_scale / distance) ** float(self.config.distance_power)
-        if self.pmt_direction_zs is not None:
-            incidence = np.maximum(
-                -np.sum(ray * self.pmt_direction_zs, axis=1),
-                0.0,
+            distance_scale = np.median(distance)
+            geometry = (distance_scale / distance) ** float(self.config.distance_power)
+            if self.pmt_direction_zs is not None:
+                incidence = np.maximum(
+                    -np.sum(ray * self.pmt_direction_zs, axis=1),
+                    0.0,
+                )
+                geometry *= incidence
+
+            contribution = (
+                slice_weight * angular * geometry * self.relative_efficiency
             )
-            geometry *= incidence
+            emission_time = emission_distance / self.config.vacuum_light_speed_mm_per_ns
+            arrival_time = (
+                float(t0_ns)
+                + emission_time
+                + distance / self.config.light_speed_mm_per_ns
+            )
+            shape += contribution
+            time_numerator += contribution * arrival_time
 
-        shape = angular * geometry * self.relative_efficiency
         shape_sum = float(np.sum(shape))
         if not np.isfinite(shape_sum) or shape_sum <= 0.0:
             raise ValueError("The shower model has zero acceptance for this parameter point.")
 
         expected_pe = float(total_detected_pe) * shape / shape_sum
-        expected_time = float(t0_ns) + distance / self.config.light_speed_mm_per_ns
+        expected_time = time_numerator / np.clip(shape, _EPS, None)
         return expected_pe, expected_time
 
     def prompt_multilateration_seed(
@@ -522,7 +585,7 @@ class ShowerFitter:
             ),
             "total_detected_pe": float(values["total_detected_pe"]),
             "metadata": {
-                "hypothesis": "empirical_one_point_shower_cone",
+                "hypothesis": self.config.emission_model,
                 "likelihood_mode": (
                     "charge_time"
                     if self.config.include_timing and observed_time is not None
@@ -532,12 +595,16 @@ class ShowerFitter:
                     name for name in self.parameter_names if not bool(minimizer.fixed[name])
                 ],
                 "cherenkov_angle_deg": float(self.config.cherenkov_angle_deg),
+                "profile_energy_mev": float(self.config.profile_energy_mev),
+                "radiation_length_mm": float(self.config.radiation_length_mm),
+                "critical_energy_mev": float(self.config.critical_energy_mev),
+                "longitudinal_slices": int(self.config.longitudinal_slices),
                 "direction_theta_bounds_deg": tuple(
                     float(value) for value in self.config.direction_theta_bounds_deg
                 ),
                 "warning": (
-                    "Effective one-point shower model; vertex and width are empirical. "
-                    "Energy requires external PE/MeV calibration."
+                    "Deterministic PDG-inspired shower template; calibrate shape and "
+                    "PE/MeV response against WCSim before physics use."
                 ),
             },
         }

@@ -41,7 +41,7 @@ when defining training samples and reporting performance.
 4. Calculate track residual features: Poisson charge deviance, timing residual
    RMS/pulls, ring residual width, observed/predicted total PE ratio, and charge
    shape distance.
-5. Fit the empirical one-point shower cone.  Compare track and shower NLL, AIC,
+5. Fit the deterministic longitudinal shower cone. Compare track and shower NLL, AIC,
    and BIC only when the fits use exactly the same active-PMT mask and the same
    charge/time likelihood conventions.
 6. Train an interpretable logistic-regression baseline.  Add a
@@ -125,10 +125,21 @@ closure versus pion energy and interaction mode before treating it as an
 unbiased energy reconstruction.  Tagged photon energy is useful as a constraint
 only within an explicit reaction/kinematic hypothesis.
 
-The simple shower fitter reports total **detected** PE.  Convert that to MeV
+The shower fitter reports total **detected** PE. Convert that to MeV
 only with a position-, direction-, and run-dependent calibration derived from
 simulation and control data.  Its fitted vertex is an effective light-emission
 point, not automatically the photon conversion vertex.
+
+## Longitudinal shower model
+
+The default `pdg_longitudinal` model sums fuzzy Cherenkov emission over fixed
+quadrature slices downstream of the conversion vertex. Slice weights follow a
+PDG-inspired gamma profile in units of the 360.8 mm water radiation length;
+the profile energy is fixed from the tagged photon energy, so no additional
+shape parameter is floated. Arrival times include charged-particle propagation
+to each slice and optical propagation from that slice to each PMT. Use
+`emission_model="point"` only for legacy A/B comparisons. The longitudinal and
+angular templates still require WCSim calibration in the 100--600 MeV regime.
 
 ## When to build a fuller shower fitter
 

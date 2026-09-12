@@ -190,9 +190,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--shower",
         action="store_true",
-        help="Also fit the empirical one-point shower hypothesis.",
+        help="Also fit the electromagnetic-shower hypothesis.",
     )
     parser.add_argument("--shower-ncall", type=int, default=5000)
+    parser.add_argument(
+        "--shower-model",
+        choices=("pdg_longitudinal", "point"),
+        default="pdg_longitudinal",
+        help="Longitudinal multi-slice model or legacy one-point model.",
+    )
+    parser.add_argument(
+        "--shower-profile-energy-mev",
+        type=float,
+        default=None,
+        help="Fixed tagged-gamma energy shaping the shower profile; defaults to --energy-mev.",
+    )
+    parser.add_argument(
+        "--shower-longitudinal-slices",
+        type=int,
+        default=16,
+        help="Number of deterministic longitudinal quadrature slices.",
+    )
     parser.add_argument(
         "--shower-width-max-deg",
         type=float,
@@ -501,6 +519,13 @@ def main() -> int:
             pmt_direction_zs=track["direction_zs"],
             config=ShowerFitConfig(
                 ncall=args.shower_ncall,
+                emission_model=args.shower_model,
+                profile_energy_mev=(
+                    args.energy_mev
+                    if args.shower_profile_energy_mev is None
+                    else args.shower_profile_energy_mev
+                ),
+                longitudinal_slices=args.shower_longitudinal_slices,
                 vertex_half_width_mm=(
                     args.shower_vertex_half_width_mm,
                     args.shower_vertex_half_width_mm,
@@ -543,6 +568,7 @@ def main() -> int:
         )
         shower_summary = {
             "valid": shower["valid"],
+            "model": shower["metadata"]["hypothesis"],
             "nll": shower["fval"],
             "effective_vertex_mm": shower["effective_vertex_mm"],
             "direction": shower["shower_direction"],
@@ -550,6 +576,8 @@ def main() -> int:
             "ring_angular_sigma_deg": shower["ring_angular_sigma_deg"],
             "cherenkov_angle_deg": shower["metadata"]["cherenkov_angle_deg"],
             "max_beam_angle_deg": args.shower_max_beam_angle_deg,
+            "profile_energy_mev": shower["metadata"]["profile_energy_mev"],
+            "longitudinal_slices": shower["metadata"]["longitudinal_slices"],
             "angular_width_at_limit": shower["angular_width_at_limit"],
             "total_detected_pe": shower["total_detected_pe"],
         }

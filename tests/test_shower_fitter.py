@@ -19,7 +19,7 @@ class ShowerModelTests(unittest.TestCase):
         self.positions = fibonacci_sphere()
         self.model = ShowerFitter(
             self.positions,
-            config=ShowerFitConfig(include_timing=True),
+            config=ShowerFitConfig(include_timing=True, emission_model="point"),
         )
 
     def test_prediction_normalizes_to_detected_pe(self):
@@ -37,6 +37,40 @@ class ShowerModelTests(unittest.TestCase):
     def test_default_width_bound_is_not_the_cherenkov_angle(self):
         self.assertAlmostEqual(self.model.config.cherenkov_angle_deg, 41.8)
         self.assertGreater(self.model.config.angular_width_bounds_deg[1], 41.8)
+
+    def test_longitudinal_profile_is_normalized_and_downstream(self):
+        model = ShowerFitter(
+            self.positions,
+            config=ShowerFitConfig(
+                emission_model="pdg_longitudinal",
+                profile_energy_mev=400.0,
+                longitudinal_slices=16,
+            ),
+        )
+        distance, weight = model.longitudinal_profile()
+        self.assertEqual(distance.shape, (16,))
+        self.assertTrue(np.all(distance > 0.0))
+        self.assertTrue(np.all(np.diff(distance) > 0.0))
+        self.assertAlmostEqual(float(np.sum(weight)), 1.0, places=12)
+
+    def test_longitudinal_prediction_normalizes_and_has_finite_times(self):
+        model = ShowerFitter(
+            self.positions,
+            config=ShowerFitConfig(
+                emission_model="pdg_longitudinal",
+                profile_energy_mev=400.0,
+                longitudinal_slices=12,
+            ),
+        )
+        expected, times = model.predict(
+            (0.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0),
+            width_deg=15.0,
+            total_detected_pe=500.0,
+            t0_ns=2.0,
+        )
+        self.assertAlmostEqual(float(np.sum(expected)), 500.0, places=10)
+        self.assertTrue(np.all(np.isfinite(times)))
 
     def test_forward_axis_constraint(self):
         config = ShowerFitConfig(direction_theta_bounds_deg=(0.0, 20.0))
