@@ -36,8 +36,35 @@ def parse_float_list(text: str) -> list[float]:
     return values
 
 
-def isotropic_direction_seeds() -> list[tuple[float, float]]:
-    """Return direction-cosine seeds spanning one z hemisphere."""
+def isotropic_direction_seeds(count: int = 49) -> list[tuple[float, float]]:
+    """Return nearly equal-solid-angle direction seeds on the +z hemisphere.
+
+    ``cz`` is sampled uniformly, as required for uniform solid angle, while a
+    golden-angle azimuth avoids aligned rings.  The driver applies the selected
+    ``direction_z_sign`` to ``cz``; therefore ``--both-directions`` mirrors
+    these seeds onto the -z hemisphere and covers the full sphere.
+    """
+
+    if count < 2:
+        raise ValueError("isotropic direction seed count must be at least 2")
+    seeds = [(0.0, 0.0)]
+    golden_angle = np.pi * (3.0 - np.sqrt(5.0))
+    sample_count = count - 1
+    for index in range(sample_count):
+        cz = (index + 0.5) / sample_count
+        transverse = np.sqrt(max(0.0, 1.0 - cz * cz))
+        phi = index * golden_angle
+        seeds.append(
+            (
+                float(transverse * np.cos(phi)),
+                float(transverse * np.sin(phi)),
+            )
+        )
+    return seeds
+
+
+def legacy_ring_direction_seeds() -> list[tuple[float, float]]:
+    """Return the original three-ring hemisphere seeds for reproducibility."""
 
     seeds = [(0.0, 0.0)]
     for transverse in (0.45, 0.75, 0.92):
@@ -107,9 +134,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--direction-seeding",
-        choices=("beam", "isotropic"),
+        choices=("beam", "legacy_rings", "isotropic"),
         default="beam",
-        help="Use near-beam seeds or seeds spanning each fitted z hemisphere.",
+        help=(
+            "Use near-beam seeds, the previous three-ring seeds, or new "
+            "equal-solid-angle seeds spanning each fitted z hemisphere."
+        ),
+    )
+    parser.add_argument(
+        "--direction-seed-count",
+        type=int,
+        default=49,
+        help=(
+            "Number of equal-solid-angle seeds per hemisphere in isotropic mode. "
+            "With --both-directions, twice this many directions are tested."
+        ),
     )
 
     parser.add_argument("--ncall", type=int, default=15000)
@@ -369,15 +408,19 @@ def main() -> int:
         fast_seed_visible_lengths=args.visible_length_seeds_mm,
         fast_seed_ke0_mev=args.ke_seeds_mev,
         fast_seed_directions=(
-            isotropic_direction_seeds()
+            isotropic_direction_seeds(args.direction_seed_count)
             if args.direction_seeding == "isotropic"
-            else [
-                (0.0, 0.0),
-                (0.04, 0.0),
-                (-0.04, 0.0),
-                (0.0, 0.04),
-                (0.0, -0.04),
-            ]
+            else (
+                legacy_ring_direction_seeds()
+                if args.direction_seeding == "legacy_rings"
+                else [
+                    (0.0, 0.0),
+                    (0.04, 0.0),
+                    (-0.04, 0.0),
+                    (0.0, 0.04),
+                    (0.0, -0.04),
+                ]
+            )
         ),
         fast_seed_full_cartesian=False,
         max_fit_attempts=args.max_attempts,
