@@ -94,6 +94,7 @@ class SingleEventConfig:
     fit_mode: Optional[str] = None  # "full_length" or "absorption"
     likelihood_mode: Optional[str] = None  # "charge_time", "charge_only", "timing_only"
     direction_z_sign: Optional[int] = None  # +1 or -1; fit both when direction is unknown
+    direction_parameterization: Optional[str] = None  # "cx_cy" or smooth "theta_phi"
     fixed_params: Dict[str, Optional[float]] = field(default_factory=dict)
 
     # Event choice.
@@ -263,6 +264,7 @@ def _env_from_config(cfg: SingleEventConfig) -> Dict[str, str]:
     _maybe_set(env, "FIT_PARTICLE", cfg.fit_particle)
     _maybe_set(env, "FIT_MODE", cfg.fit_mode)
     _maybe_set(env, "LIKELIHOOD_MODE", cfg.likelihood_mode)
+    _maybe_set(env, "DIRECTION_PARAMETERIZATION", cfg.direction_parameterization)
     _maybe_set(env, "USE_T0_PRIOR", cfg.use_t0_prior)
     if cfg.direction_z_sign is not None:
         if int(cfg.direction_z_sign) not in {-1, 1}:

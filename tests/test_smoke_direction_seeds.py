@@ -19,13 +19,13 @@ class DirectionSeedTests(unittest.TestCase):
         radius2 = np.sum(seeds * seeds, axis=1)
         self.assertTrue(np.all(radius2 < 1.0))
 
-        cz = np.sqrt(1.0 - radius2[1:])
-        expected = (np.arange(48, dtype=float) + 0.5) / 48.0
+        cz = np.sqrt(1.0 - radius2)
+        expected = (np.arange(49, dtype=float) + 0.5) / 49.0
         self.assertTrue(np.allclose(np.sort(cz), expected))
 
     def test_seed_count_must_allow_pole_and_surface_sample(self):
         with self.assertRaises(ValueError):
-            MODULE.isotropic_direction_seeds(1)
+            MODULE.isotropic_direction_seeds(0)
 
     def test_legacy_ring_seeds_remain_available(self):
         seeds = np.asarray(MODULE.legacy_ring_direction_seeds())

@@ -149,6 +149,11 @@ USE_T0_PRIOR = _env_bool("USE_T0_PRIOR", False)
 DIRECTION_Z_SIGN = _env_int("DIRECTION_Z_SIGN", 1)
 if DIRECTION_Z_SIGN not in {-1, 1}:
     raise ValueError("DIRECTION_Z_SIGN must be +1 or -1.")
+DIRECTION_PARAMETERIZATION = os.environ.get(
+    "DIRECTION_PARAMETERIZATION", "cx_cy"
+).strip().lower()
+if DIRECTION_PARAMETERIZATION not in {"cx_cy", "theta_phi"}:
+    raise ValueError("DIRECTION_PARAMETERIZATION must be 'cx_cy' or 'theta_phi'.")
 
 
 # -----------------------------------------------------------------------------
@@ -1323,11 +1328,41 @@ def make_minuit_for_event(obs_pes, obs_ts, start_params, mpmt_types=None, fixed_
 
     emitter = EMITTER_TEMPLATE.copy()
 
-    if IS_ABSORPTION_MODE:
+    use_angles = DIRECTION_PARAMETERIZATION == "theta_phi"
+    if use_angles and ("cx" in fixed_params or "cy" in fixed_params):
+        raise ValueError(
+            "Fixed cx/cy is not supported with theta_phi; use cx_cy for fixed directions."
+        )
+    if use_angles:
+        seed_cx = float(start_params.pop("cx"))
+        seed_cy = float(start_params.pop("cy"))
+        seed_cz = float(DIRECTION_Z_SIGN) * np.sqrt(
+            max(0.0, 1.0 - seed_cx * seed_cx - seed_cy * seed_cy)
+        )
+        start_params["theta"] = float(np.arccos(np.clip(seed_cz, -1.0, 1.0)))
+        start_params["phi"] = float(np.arctan2(seed_cy, seed_cx))
+
+    if IS_ABSORPTION_MODE and use_angles:
+        def nll(x0, y0, z0, theta, phi, visible_length, full_range, t0):
+            cx = np.sin(theta) * np.cos(phi)
+            cy = np.sin(theta) * np.sin(phi)
+            return evaluate_neg_log_likelihood(
+                obs_pes, obs_ts, emitter, mpmt_types,
+                x0, y0, z0, cx, cy, visible_length, full_range, t0,
+            )
+    elif IS_ABSORPTION_MODE:
         def nll(x0, y0, z0, cx, cy, visible_length, full_range, t0):
             return evaluate_neg_log_likelihood(
                 obs_pes, obs_ts, emitter, mpmt_types,
                 x0, y0, z0, cx, cy, visible_length, full_range, t0,
+            )
+    elif use_angles:
+        def nll(x0, y0, z0, theta, phi, length, t0):
+            cx = np.sin(theta) * np.cos(phi)
+            cy = np.sin(theta) * np.sin(phi)
+            return evaluate_neg_log_likelihood(
+                obs_pes, obs_ts, emitter, mpmt_types,
+                x0, y0, z0, cx, cy, length, t0,
             )
     else:
         def nll(x0, y0, z0, cx, cy, length, t0):
@@ -1343,17 +1378,27 @@ def make_minuit_for_event(obs_pes, obs_ts, start_params, mpmt_types=None, fixed_
     m.limits["x0"] = (-2000, 2000)
     m.limits["y0"] = (-2000, 2000)
     m.limits["z0"] = (-2000, 2000)
-    # Direction cosines may approach one for tracks far from the z axis.
-    # The likelihood separately rejects cx**2 + cy**2 >= 1.
-    m.limits["cx"] = (-0.999, 0.999)
-    m.limits["cy"] = (-0.999, 0.999)
+    if use_angles:
+        m.limits["theta"] = (
+            (0.0, 0.5 * np.pi)
+            if DIRECTION_Z_SIGN > 0
+            else (0.5 * np.pi, np.pi)
+        )
+        m.limits["phi"] = (-np.pi, np.pi)
+    else:
+        m.limits["cx"] = (-0.999, 0.999)
+        m.limits["cy"] = (-0.999, 0.999)
     m.limits["t0"] = (-8.0, 8.0)
 
     m.errors["x0"] = 30.0
     m.errors["y0"] = 30.0
     m.errors["z0"] = 30.0
-    m.errors["cx"] = 0.01
-    m.errors["cy"] = 0.01
+    if use_angles:
+        m.errors["theta"] = 0.02
+        m.errors["phi"] = 0.02
+    else:
+        m.errors["cx"] = 0.01
+        m.errors["cy"] = 0.01
     m.errors["t0"] = 0.1
 
     if IS_ABSORPTION_MODE:
@@ -1550,6 +1595,11 @@ def compact_seed_scan(seed_scan_sorted):
 def build_result_from_minuit(m, attempt, start_params, chosen_seed_idx, chosen_seed_fcn, seed_scan_sorted):
     current_fval = float(m.fval) if (m.fval is not None and np.isfinite(m.fval)) else np.inf
     current_values = m.values.to_dict()
+    if DIRECTION_PARAMETERIZATION == "theta_phi":
+        theta = float(current_values["theta"])
+        phi = float(current_values["phi"])
+        current_values["cx"] = float(np.sin(theta) * np.cos(phi))
+        current_values["cy"] = float(np.sin(theta) * np.sin(phi))
 
     fitted_z0 = float(current_values["z0"])
     fitted_length = result_length_value(current_values)

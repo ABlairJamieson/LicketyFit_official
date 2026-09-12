@@ -45,13 +45,13 @@ def isotropic_direction_seeds(count: int = 49) -> list[tuple[float, float]]:
     these seeds onto the -z hemisphere and covers the full sphere.
     """
 
-    if count < 2:
-        raise ValueError("isotropic direction seed count must be at least 2")
-    seeds = [(0.0, 0.0)]
+    if count < 1:
+        raise ValueError("isotropic direction seed count must be at least 1")
+    seeds = []
     golden_angle = np.pi * (3.0 - np.sqrt(5.0))
-    sample_count = count - 1
-    for index in range(sample_count):
-        cz = (index + 0.5) / sample_count
+    for index in range(count):
+        # Cell centres avoid the coordinate singularities at theta=0 and pi.
+        cz = (index + 0.5) / count
         transverse = np.sqrt(max(0.0, 1.0 - cz * cz))
         phi = index * golden_angle
         seeds.append(
@@ -146,8 +146,17 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=49,
         help=(
-            "Number of equal-solid-angle seeds per hemisphere in isotropic mode. "
+            "Number of equal-solid-angle cell-centre seeds per hemisphere. "
             "With --both-directions, twice this many directions are tested."
+        ),
+    )
+    parser.add_argument(
+        "--track-direction-parameterization",
+        choices=("theta_phi", "cx_cy"),
+        default="theta_phi",
+        help=(
+            "Smooth spherical angles for Minuit (recommended), or the legacy "
+            "constrained direction-cosine parameterization."
         ),
     )
 
@@ -396,6 +405,7 @@ def main() -> int:
         likelihood_mode=args.likelihood_mode,
         energy_true=args.energy_mev,
         direction_z_sign=args.direction_z_sign,
+        direction_parameterization=args.track_direction_parameterization,
         ring_mask_mode="none",
         fixed_params=fixed_params,
         fast_seed_x0=args.x_seeds_mm,
