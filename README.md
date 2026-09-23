@@ -54,6 +54,136 @@ The tutorial contains CERN EOS data paths. Change those to accessible data
 files before running its cells. ROOT input is read with Uproot; the tutorial
 does not require a PyROOT import.
 
+### CERN LXPLUS / SWAN setup
+
+Keep the checkout and its Python environment in your CERNBox/EOS project area
+so they are available from both LXPLUS and SWAN. For this analysis branch, an
+existing checkout can be updated with:
+
+```bash
+cd /eos/user/a/USER/SWAN_projects/PROJECT/LicketyFit_official
+
+# HTTPS permits unauthenticated pulls from the public fork. Pushing still
+# requires a GitHub token or an SSH key registered with GitHub.
+git remote set-url origin https://github.com/ABlairJamieson/LicketyFit_official.git
+git switch pion-shower-analysis
+git pull --ff-only origin pion-shower-analysis
+git submodule update --init analysis_tools Geometry
+```
+
+Replace `USER` and `PROJECT` with your CERN username and SWAN project. A fresh
+checkout of this branch is equivalent:
+
+```bash
+cd "$CERNBOX_HOME/SWAN_projects"
+git clone --branch pion-shower-analysis \
+  https://github.com/ABlairJamieson/LicketyFit_official.git
+cd LicketyFit_official
+git submodule update --init analysis_tools Geometry
+```
+
+Create a repository-local virtual environment. `--system-site-packages` reuses
+compatible packages supplied by CERN while `pip` installs missing requirements,
+including `iminuit`, into the isolated environment:
+
+```bash
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+python3 -m pip install --upgrade pip
+python3 -m pip install -r requirements.txt
+```
+
+Verify that the interpreter and core packages come from the intended
+environment:
+
+```bash
+which python3
+python3 - <<'PY'
+from importlib.metadata import version
+
+for package in ("numpy", "iminuit", "numba", "scipy", "matplotlib"):
+    print(f"{package:12s} {version(package)}")
+
+from Geometry.Device import Device
+print("Geometry import: OK", Device)
+PY
+
+python3 scripts/check_setup.py
+```
+
+For every new LXPLUS login or SWAN terminal, reactivate the same environment:
+
+```bash
+cd /eos/user/a/USER/SWAN_projects/PROJECT/LicketyFit_official
+source .venv/bin/activate
+```
+
+If a command fails with `ModuleNotFoundError`, first confirm that the prompt
+shows `(.venv)` and that `which python3` points inside this checkout. Do not run
+large NPZ conversions or multi-event fits interactively on an LXPLUS login
+node; use HTCondor for those jobs. Small setup checks and one-event pilot fits
+are appropriate interactively. More CERN-specific notes are in
+[`SWAN_SETUP.md`](SWAN_SETUP.md).
+
+#### Tagged-gamma analysis files on CERN
+
+The WCTE v1.5.1 tagged-gamma ROOT production is located at:
+
+```text
+/eos/experiment/wcte/MC_Production/v1.5.1/tagged_gamma/
+```
+
+The converted DataTools NPZ files used by the pion-versus-shower study are in:
+
+```text
+/eos/experiment/wcte/MC_Production/v1.5.1/tagged_gamma/converted_npz/
+```
+
+The full tagged-gamma samples follow this pattern:
+
+```text
+mdt_e1000MeV_gamma_cyl_HD1.npz
+mdt_e1000MeV_gamma_cyl_HD2.npz
+...
+mdt_e1000MeV_gamma_cyl_HD14.npz
+```
+
+Here `e1000MeV` is the incident positron-beam energy, not the event's tagged
+photon energy. The hodoscope element (`HD1`, `HD2`, and so on) determines the
+photon-energy range, while the per-event `energy`/`primary_energy_mev` field
+contains the simulated photon energy used by the analysis.
+
+List the available full samples with:
+
+```bash
+NPZDIR=/eos/experiment/wcte/MC_Production/v1.5.1/tagged_gamma/converted_npz
+find "$NPZDIR" -maxdepth 1 -name 'mdt_e1000MeV_gamma_cyl_HD*.npz' \
+  ! -name '*_events*.npz' | sort
+```
+
+`mdt_e1000MeV_gamma_cyl_HD5_events00000-00099.npz` is a 100-event development
+skim whose events duplicate the beginning of the full HD5 file. Exclude it
+from production counts and training/validation samples unless deliberately
+testing commands on the small skim.
+
+The truth census generated in this repository is normally stored at:
+
+```text
+outputs/tagged_gamma_truth_all/tagged_gamma_event_topologies.csv
+outputs/tagged_gamma_truth_all/summary.json
+```
+
+The reproducibly selected 50-events-per-class validation sample is stored at:
+
+```text
+outputs/pion_shower_sample/fit_manifest.csv
+outputs/pion_shower_sample/selected_events.npz
+outputs/pion_shower_sample/selection_summary.json
+```
+
+`selected_events.npz` is the compact fitter input. The manifest retains the
+original full-NPZ path and source event index for every selected event.
+
 ## Choose the reconstruction
 
 **Seeding and interaction are two independent settings.** Set both in the
