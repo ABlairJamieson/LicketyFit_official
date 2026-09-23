@@ -865,7 +865,15 @@ def _load_wcsim_raw_event(driver, cfg: SingleEventConfig, event: Any = None) -> 
     if not input_file:
         raise ValueError("Set wcsim_input_file or pass event=... for WCSim fits.")
 
-    data_raw = driver.read_sim_data(input_file)
+    # The single-event fitter needs only digitized PMT IDs, times, and charges.
+    # Passing no field list activates read_sim_data's legacy all-truth contract,
+    # which is both memory-heavy and incompatible with compact fit skims.
+    fit_fields = getattr(
+        driver,
+        "FIT_FIELDS",
+        ("digi_hit_pmt", "digi_hit_charge", "digi_hit_time"),
+    )
+    data_raw = driver.read_sim_data(input_file, fields=fit_fields)
     idx = int(cfg.event_index)
     n_available = len(data_raw["digi_hit_time"])
     if idx < 0 or idx >= n_available:

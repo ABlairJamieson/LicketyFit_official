@@ -28,6 +28,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shower-ncall", type=int, default=5000)
     parser.add_argument("--direction-seed-count", type=int, default=49)
     parser.add_argument("--max-attempts", type=int, default=2)
+    parser.add_argument(
+        "--pilot-seeds",
+        action="store_true",
+        help=(
+            "Use a small vertex/length/energy seed bank for setup checks. "
+            "Do not use this option for the final separation study."
+        ),
+    )
     parser.add_argument("--max-events", type=int, default=None)
     parser.add_argument("--category", action="append", default=[])
     parser.add_argument("--dry-run", action="store_true")
@@ -51,7 +59,7 @@ def nested(mapping: dict[str, Any], *keys: str) -> Any:
 
 def build_common(args: argparse.Namespace, row: dict[str, str], output: Path) -> list[str]:
     energy = float(row.get("primary_energy_mev") or 1000.0)
-    return [
+    command = [
         sys.executable,
         "scripts/run_pion_shower_smoke_test.py",
         "--input", row["fit_input_file"],
@@ -71,6 +79,17 @@ def build_common(args: argparse.Namespace, row: dict[str, str], output: Path) ->
         "--max-attempts", str(args.max_attempts),
         "--output-dir", str(output),
     ]
+    if args.pilot_seeds:
+        command.extend(
+            [
+                "--x-seeds-mm", "0",
+                "--y-seeds-mm", "0",
+                "--z-seeds-mm=-1500,-1200,-900",
+                "--visible-length-seeds-mm", "200,700,1200",
+                "--ke-seeds-mev", "150,300,600",
+            ]
+        )
+    return command
 
 
 def run_command(command: list[str], log_path: Path, dry_run: bool) -> int:

@@ -190,6 +190,10 @@ outputs/pion_shower_sample/selection_summary.json
 `selected_events.npz` is the compact fitter input. The manifest retains the
 original full-NPZ path and source event index for every selected event.
 
+For a short setup check, pass `--pilot-seeds` to
+`scripts/run_pion_shower_sample.py`. This sharply reduces the seed bank and is
+not intended for the final likelihood-separation measurement.
+
 ## Choose the reconstruction
 
 **Seeding and interaction are two independent settings.** Set both in the

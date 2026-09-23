@@ -206,6 +206,7 @@ First run a small pilot and inspect its logs:
 python3 scripts/run_pion_shower_sample.py \
   outputs/pion_shower_sample/fit_manifest.csv \
   --max-events 5 \
+  --pilot-seeds \
   --output-dir outputs/pion_shower_fits_pilot
 ```
 
