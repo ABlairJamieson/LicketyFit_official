@@ -27,6 +27,8 @@ from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
+
+from .pickle_compat import load_numpy_pickle
 from numba import njit
 
 
@@ -317,7 +319,7 @@ def _load_rel_mpmt_eff_tables():
         return _REL_MPMT_EFF_CACHE
 
     with open(path, "rb") as f:
-        rel_mpmt_eff = pickle.load(f)
+        rel_mpmt_eff = load_numpy_pickle(f)
 
     _REL_MPMT_EFF_CACHE = (
         np.asarray(rel_mpmt_eff["tri_exsitu"], dtype=np.float64),

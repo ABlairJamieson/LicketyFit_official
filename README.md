@@ -125,6 +125,12 @@ node; use HTCondor for those jobs. Small setup checks and one-event pilot fits
 are appropriate interactively. More CERN-specific notes are in
 [`SWAN_SETUP.md`](SWAN_SETUP.md).
 
+Calibration dictionaries containing NumPy arrays may have been generated with
+a newer NumPy release than the CERN system installation. LicketyFit's table
+loader maps NumPy 2's serialized `numpy._core` module names to their NumPy 1
+equivalents, so it is not necessary to upgrade the entire CERN numerical stack
+solely to read these dictionaries.
+
 #### Tagged-gamma analysis files on CERN
 
 The WCTE v1.5.1 tagged-gamma ROOT production is located at:
