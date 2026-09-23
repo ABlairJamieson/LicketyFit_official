@@ -430,7 +430,7 @@ from Geometry.Device import Device
 from LicketyFit.Event import Event
 from LicketyFit.PMT import PMT
 from LicketyFit.Emitter import Emitter
-from read_sim_data import read_sim_data
+from read_sim_data import FIT_FIELDS, read_sim_data
 from particle_cherenkov_model import (
     get_energy_distance_tables,
     set_active_particle,
@@ -1901,7 +1901,10 @@ def main():
         if missing:
             raise ValueError(f"Seed {i} is missing keys: {missing}")
 
-    data_raw = read_sim_data(INPUT_FILE)
+    # Fitting needs only digitized PMT IDs, charges, and times.  Loading the
+    # photon/track truth arrays here makes large tagged-gamma files need tens
+    # of GB of memory for no benefit.
+    data_raw = read_sim_data(INPUT_FILE, fields=FIT_FIELDS)
 
     set_active_particle(FIT_PARTICLE_CANONICAL)
     OVERALL_DISTANCES, INIT_ENERGY_TABLE, _distance_rows = get_energy_distance_tables(

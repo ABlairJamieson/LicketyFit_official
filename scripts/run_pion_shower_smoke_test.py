@@ -254,9 +254,21 @@ def resolve_from_root(value: str | Path, root: Path) -> Path:
 
 
 def load_payload(path: Path) -> Mapping[str, Any]:
+    """Load only small event-level truth arrays used for the printed report."""
     loaded = np.load(path, allow_pickle=True)
     if hasattr(loaded, "files"):
-        return {name: loaded[name] for name in loaded.files}
+        wanted = (
+            "position",
+            "direction",
+            "energy",
+            "true_vis_length",
+            "track_start_position",
+            "track_stop_position",
+        )
+        try:
+            return {name: loaded[name] for name in wanted if name in loaded.files}
+        finally:
+            loaded.close()
     if isinstance(loaded, np.ndarray) and loaded.shape == ():
         item = loaded.item()
         if isinstance(item, Mapping):

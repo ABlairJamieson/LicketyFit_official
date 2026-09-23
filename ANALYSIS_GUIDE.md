@@ -183,3 +183,44 @@ features.update(compare_fit_hypotheses(track, shower))
 
 Train only after adding event identifiers, truth labels, tagged photon energy,
 and independent production/run groups to the resulting feature table.
+# Balanced pion-versus-shower validation sample
+
+After producing `tagged_gamma_event_topologies.csv`, select 50 events in each
+of five useful truth groups and write a compact NPZ containing only those 250
+events:
+
+```bash
+python3 scripts/select_pion_shower_sample.py \
+  outputs/tagged_gamma_truth_all/tagged_gamma_event_topologies.csv \
+  --per-category 50 \
+  --output-dir outputs/pion_shower_sample
+```
+
+The groups are pi+ decay, pi+ interaction, pi- interaction, no pion, and
+pi0-only. Selection is reproducible and spread across source files. The compact
+NPZ avoids reopening multi-gigabyte production files for every fit.
+
+First run a small pilot and inspect its logs:
+
+```bash
+python3 scripts/run_pion_shower_sample.py \
+  outputs/pion_shower_sample/fit_manifest.csv \
+  --max-events 5 \
+  --output-dir outputs/pion_shower_fits_pilot
+```
+
+Then omit `--max-events` for all 250 events. The runner is resumable: it writes
+each event immediately and skips completed events. It compares a forward
+PDG-longitudinal shower fit against unrestricted full-length and absorption
+pion fits. Positive `delta_nll_shower_minus_pion` favors the best pion fit.
+
+Summarize the completed study with:
+
+```bash
+python3 scripts/analyze_pion_shower_results.py \
+  outputs/pion_shower_fits/fit_results.csv
+```
+
+The balanced sample is for conditional separation studies. It does not reflect
+the very low pion prior in the tagged-gamma beam, so efficiency and background
+rejection should be reported separately from expected beam purity.
