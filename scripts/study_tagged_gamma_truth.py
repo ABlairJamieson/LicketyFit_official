@@ -55,6 +55,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--first-event", type=int, default=0)
     parser.add_argument("--max-events-per-file", type=int, default=None)
     parser.add_argument(
+        "--skip-light-fractions",
+        action="store_true",
+        help=(
+            "Skip true_hit_parent loading and light-source fractions. This is "
+            "recommended for a fast, lower-memory production-topology census."
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("outputs/tagged_gamma_truth"),
@@ -100,7 +108,24 @@ def main() -> int:
     with csv_path.open("w", newline="", encoding="utf-8") as output:
         for file_index, input_path in enumerate(input_files, start=1):
             with np.load(input_path, allow_pickle=True) as data:
-                file_events = len(data["pid"])
+                # NpzFile.__getitem__ decompresses an array on every access.
+                # Cache only the truth arrays needed by this analysis once per
+                # file; otherwise the event loop repeatedly decompresses very
+                # large object arrays.
+                required_keys = (
+                    "pid",
+                    "energy",
+                    "event_id",
+                    "track_pid",
+                    "track_parent",
+                    "track_id",
+                    "track_energy",
+                )
+                cached = {key: data[key] for key in required_keys if key in data}
+                if not args.skip_light_fractions and "true_hit_parent" in data:
+                    cached["true_hit_parent"] = data["true_hit_parent"]
+
+                file_events = len(cached["pid"])
                 start = args.first_event
                 if start < 0 or start >= file_events:
                     raise IndexError(
@@ -116,7 +141,7 @@ def main() -> int:
                     flush=True,
                 )
                 for event in range(start, stop):
-                    row = infer_tagged_gamma_topology(data, event)
+                    row = infer_tagged_gamma_topology(cached, event)
                     row["input_file"] = str(input_path)
                     if writer is None:
                         writer = csv.DictWriter(output, fieldnames=list(row.keys()))
@@ -145,6 +170,7 @@ def main() -> int:
         "n_files": len(input_files),
         "n_events": n_events,
         "excluded_skims_by_default": not args.include_skims,
+        "light_fractions_skipped": args.skip_light_fractions,
         "warning": (
             "These are inferred signatures, not exact Geant4 process labels. "
             "The available track_parent field behaves like parent-PDG metadata."
