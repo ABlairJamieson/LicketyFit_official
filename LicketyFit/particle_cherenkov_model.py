@@ -28,7 +28,13 @@ from pathlib import Path
 
 import numpy as np
 
-from .pickle_compat import load_numpy_pickle
+try:
+    # Normal package import: LicketyFit.particle_cherenkov_model.
+    from .pickle_compat import load_numpy_pickle
+except ImportError:  # pragma: no cover - exercised by legacy driver imports
+    # The historical batch drivers put LicketyFit/ itself on sys.path and
+    # import this file as the top-level module ``particle_cherenkov_model``.
+    from pickle_compat import load_numpy_pickle
 from numba import njit
 
 
