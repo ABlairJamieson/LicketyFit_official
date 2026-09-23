@@ -122,21 +122,35 @@ def aggregate(rows: list[dict[str, str]], output_dir: Path) -> None:
         shower_nll = nested(absorption, "shower_summary", "nll")
         absorption_nll = nested(absorption, "track_summary", "fcn")
         full_nll = nested(full, "track_summary", "fcn")
-        finite_tracks = [float(v) for v in (absorption_nll, full_nll) if isinstance(v, (int, float))]
-        best_track = min(finite_tracks) if finite_tracks else None
+        absorption_valid = nested(absorption, "track_summary", "valid") is True
+        full_valid = nested(full, "track_summary", "valid") is True
+        shower_valid = nested(absorption, "shower_summary", "valid") is True
+        valid_tracks = []
+        if absorption_valid and isinstance(absorption_nll, (int, float)):
+            valid_tracks.append(("absorption", float(absorption_nll)))
+        if full_valid and isinstance(full_nll, (int, float)):
+            valid_tracks.append(("full_length", float(full_nll)))
+        best_hypothesis, best_track = (
+            min(valid_tracks, key=lambda item: item[1])
+            if valid_tracks
+            else (None, None)
+        )
+        comparison_valid = shower_valid and best_track is not None
         record.update({
             "shower_nll": shower_nll,
             "absorption_pion_nll": absorption_nll,
             "full_length_pion_nll": full_nll,
             "best_pion_nll": best_track,
+            "best_pion_hypothesis": best_hypothesis,
+            "fit_comparison_valid": comparison_valid,
             "delta_nll_shower_minus_pion": (
                 float(shower_nll) - best_track
-                if isinstance(shower_nll, (int, float)) and best_track is not None
+                if comparison_valid and isinstance(shower_nll, (int, float))
                 else None
             ),
-            "absorption_valid": nested(absorption, "track_summary", "valid"),
-            "full_length_valid": nested(full, "track_summary", "valid"),
-            "shower_valid": nested(absorption, "shower_summary", "valid"),
+            "absorption_valid": absorption_valid,
+            "full_length_valid": full_valid,
+            "shower_valid": shower_valid,
         })
         features = absorption.get("topology_features", {})
         for name, value in features.items():

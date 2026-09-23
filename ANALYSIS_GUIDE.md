@@ -214,6 +214,8 @@ Then omit `--max-events` for all 250 events. The runner is resumable: it writes
 each event immediately and skips completed events. It compares a forward
 PDG-longitudinal shower fit against unrestricted full-length and absorption
 pion fits. Positive `delta_nll_shower_minus_pion` favors the best pion fit.
+The score is emitted only when the shower fit and at least one pion fit are
+valid; command completion alone is not treated as fit validity.
 
 Summarize the completed study with:
 

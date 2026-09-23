@@ -77,6 +77,8 @@ def main() -> int:
     usable: list[tuple[str, float]] = []
     by_category: dict[str, list[float]] = defaultdict(list)
     for row in rows:
+        if row.get("fit_comparison_valid", "").lower() not in {"true", "1"}:
+            continue
         score = finite_float(row.get("delta_nll_shower_minus_pion"))
         if score is not None:
             category = row["selection_category"]
