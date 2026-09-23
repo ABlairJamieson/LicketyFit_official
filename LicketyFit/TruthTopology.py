@@ -178,6 +178,107 @@ def infer_event_topology(data: Any, event: int) -> dict[str, Any]:
     return result
 
 
+def infer_tagged_gamma_topology(data: Any, event: int) -> dict[str, Any]:
+    """Infer charged-pion production and subsequent topology in a gamma event.
+
+    The DataTools files available for this analysis encode parent information
+    as PDG-like values rather than a complete, reliable track-ID ancestry tree.
+    The returned labels are therefore conservative signatures, not generator
+    process labels or exclusive reaction-channel identifications.
+    """
+
+    result = infer_event_topology(data, event)
+    track_pid = _event_array(data, "track_pid", event, int)
+    track_parent = _event_array(data, "track_parent", event, int)
+    track_energy = (
+        _event_array(data, "track_energy", event, float)
+        if "track_energy" in data
+        else np.full(len(track_pid), np.nan)
+    )
+
+    has_plus = bool(np.any(track_pid == 211))
+    has_minus = bool(np.any(track_pid == -211))
+    has_pi0 = bool(np.any(track_pid == 111))
+
+    def pion_signature(pion_pid: int) -> dict[str, Any]:
+        parent_mask = track_parent == pion_pid
+        children = track_pid[parent_mask]
+        has_parented_pi0 = bool(np.any(children == 111))
+        has_parented_nucleon = bool(np.any(np.isin(children, tuple(NUCLEON_PDGS))))
+        has_parented_nucleus = bool(np.any(np.abs(children) >= 1_000_000_000))
+        has_outgoing_pion = bool(np.any(np.isin(children, tuple(PION_PDGS))))
+        has_decay_muon = bool(np.any(np.isin(children, tuple(MUON_PDGS))))
+        hadronic = bool(
+            has_parented_pi0
+            or has_parented_nucleon
+            or has_parented_nucleus
+            or has_outgoing_pion
+        )
+
+        # A pion whose parent is not itself is the best available proxy for a
+        # newly produced pion.  Take the maximum when multiple candidates exist.
+        produced_mask = (track_pid == pion_pid) & (track_parent != pion_pid)
+        energies = track_energy[produced_mask]
+        energies = energies[np.isfinite(energies)]
+        return {
+            "hadronic": hadronic,
+            "with_pi0": has_parented_pi0,
+            "decay": has_decay_muon,
+            "max_produced_energy_mev": float(np.max(energies)) if energies.size else float("nan"),
+        }
+
+    plus = pion_signature(211)
+    minus = pion_signature(-211)
+
+    if has_plus and has_minus:
+        production = "charged_pions_both_signs"
+        topology = "multiple_sign_charged_pions"
+    elif has_plus:
+        production = "pi_plus_produced"
+        if plus["with_pi0"]:
+            topology = "pi_plus_interacting_with_pi0"
+        elif plus["hadronic"]:
+            topology = "pi_plus_interacting_no_pi0"
+        elif plus["decay"]:
+            topology = "pi_plus_decay_candidate"
+        else:
+            topology = "pi_plus_clean_candidate"
+    elif has_minus:
+        production = "pi_minus_produced"
+        if minus["with_pi0"]:
+            topology = "pi_minus_interacting_with_pi0"
+        elif minus["hadronic"]:
+            topology = "pi_minus_interacting_no_pi0"
+        elif minus["decay"]:
+            topology = "pi_minus_decay_candidate"
+        else:
+            topology = "pi_minus_clean_candidate"
+    elif has_pi0:
+        production = "pi0_only"
+        topology = "pi0_without_charged_pion"
+    else:
+        production = "no_pion"
+        topology = "no_pion"
+
+    result.update(
+        {
+            "production_class": production,
+            "tagged_gamma_topology": topology,
+            "has_produced_charged_pion": has_plus or has_minus,
+            "has_pi_plus": has_plus,
+            "has_pi_minus": has_minus,
+            "has_pi0_anywhere": has_pi0,
+            "pi_plus_hadronic_signature": plus["hadronic"],
+            "pi_minus_hadronic_signature": minus["hadronic"],
+            "pi_plus_decay_signature": plus["decay"],
+            "pi_minus_decay_signature": minus["decay"],
+            "max_produced_pi_plus_energy_mev": plus["max_produced_energy_mev"],
+            "max_produced_pi_minus_energy_mev": minus["max_produced_energy_mev"],
+        }
+    )
+    return result
+
+
 def analyze_truth_file(path: str | Path, first_event: int = 0, max_events: int | None = None) -> list[dict[str, Any]]:
     """Analyze a contiguous range of events in a DataTools NPZ file."""
 

@@ -1,6 +1,6 @@
 import numpy as np
 
-from LicketyFit.TruthTopology import infer_event_topology
+from LicketyFit.TruthTopology import infer_event_topology, infer_tagged_gamma_topology
 
 
 def object_events(*events):
@@ -57,3 +57,39 @@ def test_ambiguous_track_ids_are_not_misattributed():
 
     assert result["true_hit_fraction_ambiguous_track_id"] == 1.0
     assert result["true_hit_fraction_charged_pion"] == 0.0
+
+
+def test_tagged_gamma_finds_produced_interacting_pi_plus():
+    data = {
+        "pid": np.array([22]),
+        "energy": np.array([600.0]),
+        "track_id": object_events(np.array([1, 2, 3, 4])),
+        "track_pid": object_events(np.array([22, 211, 111, 2212])),
+        "track_parent": object_events(np.array([0, 22, 211, 211])),
+        "track_energy": object_events(np.array([600.0, 320.0, 160.0, 980.0])),
+        "true_hit_parent": object_events(np.array([2, 2, 3])),
+    }
+
+    result = infer_tagged_gamma_topology(data, 0)
+
+    assert result["production_class"] == "pi_plus_produced"
+    assert result["tagged_gamma_topology"] == "pi_plus_interacting_with_pi0"
+    assert result["has_produced_charged_pion"]
+    assert result["max_produced_pi_plus_energy_mev"] == 320.0
+
+
+def test_tagged_gamma_pi0_only_is_not_charged_pion_signal():
+    data = {
+        "pid": np.array([22]),
+        "energy": np.array([400.0]),
+        "track_id": object_events(np.array([1, 2])),
+        "track_pid": object_events(np.array([22, 111])),
+        "track_parent": object_events(np.array([0, 22])),
+        "track_energy": object_events(np.array([400.0, 180.0])),
+    }
+
+    result = infer_tagged_gamma_topology(data, 0)
+
+    assert result["production_class"] == "pi0_only"
+    assert result["tagged_gamma_topology"] == "pi0_without_charged_pion"
+    assert not result["has_produced_charged_pion"]
