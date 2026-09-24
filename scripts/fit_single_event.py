@@ -895,7 +895,11 @@ def _prepare_wcsim_observables(driver, cfg: SingleEventConfig, event: Any = None
 
     apply_window = cfg.apply_peak_time_window
     if apply_window is None:
-        apply_window = True
+        # Match the production WCSim driver: use converted digit times as-is.
+        # A previous single-event default applied a one-sided modal-time cut
+        # that was absent from production and could retain arbitrarily early
+        # hits. Keep it available only as an explicit diagnostic option.
+        apply_window = False
     if apply_window:
         hit_pmts, hit_times, hit_charges = _apply_wcsim_peak_window(hit_pmts, hit_times, hit_charges)
 

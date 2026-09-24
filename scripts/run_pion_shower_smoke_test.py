@@ -90,6 +90,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--geometry-dir", default="../Geometry")
     parser.add_argument("--geometry-file", default=None)
     parser.add_argument("--table-dir", default="tables")
+    parser.add_argument(
+        "--apply-wcsim-peak-window",
+        action="store_true",
+        help=(
+            "Apply the legacy single-event one-sided modal-time window. "
+            "Disabled by default to match the production WCSim driver."
+        ),
+    )
 
     parser.add_argument("--particle", default="proton")
     parser.add_argument("--energy-mev", type=float, default=800.0)
@@ -437,6 +445,7 @@ def main() -> int:
         direction_z_sign=args.direction_z_sign,
         direction_parameterization=args.track_direction_parameterization,
         ring_mask_mode="none",
+        apply_peak_time_window=args.apply_wcsim_peak_window,
         fixed_params=fixed_params,
         fast_seed_x0=args.x_seeds_mm,
         fast_seed_y0=args.y_seeds_mm,
@@ -608,6 +617,7 @@ def main() -> int:
     report = {
         "input_file": str(input_path),
         "event_index": args.event_index,
+        "wcsim_peak_time_window_applied": args.apply_wcsim_peak_window,
         "truth": truth,
         "track_summary": summary,
         "track_diagnostics": diagnostics,

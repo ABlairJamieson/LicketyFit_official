@@ -194,6 +194,11 @@ For a short setup check, pass `--pilot-seeds` to
 `scripts/run_pion_shower_sample.py`. This sharply reduces the seed bank and is
 not intended for the final likelihood-separation measurement.
 
+The single-event WCSim path uses converted digit times without shifting or
+windowing by default, matching the production WCSim driver. The optional
+`--apply-wcsim-peak-window` smoke-test flag reproduces the earlier one-sided
+modal-time cut for controlled diagnostics only.
+
 ## Choose the reconstruction
 
 **Seeding and interaction are two independent settings.** Set both in the

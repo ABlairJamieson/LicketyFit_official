@@ -231,6 +231,11 @@ pion fits. Positive `delta_nll_shower_minus_pion` favors the best pion fit.
 The score is emitted only when the shower fit and at least one pion fit are
 valid; command completion alone is not treated as fit validity.
 
+WCSim digit times are passed through without a peak-time cut by default, which
+matches the production WCSim driver. The historical single-event one-sided cut
+can be reproduced for diagnostics with `--apply-wcsim-peak-window` when running
+`run_pion_shower_smoke_test.py` directly.
+
 Summarize the completed study with:
 
 ```bash
