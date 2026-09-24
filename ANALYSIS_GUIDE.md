@@ -200,6 +200,20 @@ The groups are pi+ decay, pi+ interaction, pi- interaction, no pion, and
 pi0-only. Selection is reproducible and spread across source files. The compact
 NPZ avoids reopening multi-gigabyte production files for every fit.
 
+Before fitting, validate the charge/time inputs and the effect of the fitter's
+prompt-time window:
+
+```bash
+python3 scripts/study_selected_observables.py \
+  outputs/pion_shower_sample/fit_manifest.csv \
+  --output-dir outputs/pion_shower_observable_checks
+```
+
+This writes per-event metrics and distributions by truth category. In the
+current likelihood, track charge is normalized to the observed event total and
+the shower total PE is floated, so total charge is a topology feature but not
+part of the track-versus-shower absolute-yield comparison.
+
 First run a small pilot and inspect its logs:
 
 ```bash
