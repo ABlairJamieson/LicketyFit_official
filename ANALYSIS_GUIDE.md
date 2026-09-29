@@ -313,3 +313,40 @@ result is an *apparent* delay constant until the trigger/readout efficiency
 versus delay and non-Michel backgrounds are measured. Pass `--bins 60` for
 100 ns bins, `--fit-min-ns` to adjust the fitted interval, or `--no-fit` to
 show the histograms alone.
+
+Inspect the size of the best delayed burst with separate distributions of
+digit hits, distinct hit PMTs, and total digit charge:
+
+```bash
+python3 scripts/plot_delayed_cluster_hits.py \
+  outputs/delayed_pion_pilot_v3/events.csv \
+  --output outputs/delayed_pion_pilot_v3/delayed_cluster_hits.png
+```
+
+The hit and charge distributions can guide a possible high-light cut, but
+their relation to Michel energy also depends on the event position and PMT
+coverage. Keep any cut exploratory until a no-pion control is measured.
+
+To estimate the effective light origin of each best delayed cluster, first
+try 20 candidates, then omit `--max-candidates` for all candidates:
+
+```bash
+python3 scripts/reconstruct_delayed_vertices.py \
+  outputs/delayed_pion_pilot_v3/clusters.csv \
+  --max-candidates 20 \
+  --output-dir outputs/delayed_pion_pilot_v3/vertex_pilot
+
+python3 scripts/reconstruct_delayed_vertices.py \
+  outputs/delayed_pion_pilot_v3/clusters.csv \
+  --output-dir outputs/delayed_pion_pilot_v3/vertices_all
+```
+
+This uses the existing point multilateration seed on digits inside the saved
+cluster window. The PMT coordinates come from `tables/wcsim_wcte_mapping.txt`
+in WCSim centimetres, converted to millimetres; the separate design-geometry
+file has a different origin and would bias these WCSim vertex estimates.
+`vertices.csv` records failures and timing residuals. The PNG shows beam-axis
+`r=sqrt(x^2+y^2)` versus `z`, and the tank's cylindrical radius
+`R=sqrt(x^2+z^2)` versus vertical `y`. These point-source estimates can be
+biased by a Michel positron's finite track; no containment or quality cut is
+applied to the plot yet.
