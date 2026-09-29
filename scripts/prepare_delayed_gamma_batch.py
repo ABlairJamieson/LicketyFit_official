@@ -25,7 +25,8 @@ def safe_path(path: Path) -> str:
 
 
 def prepare(npz_dir: Path, output_dir: Path, *, python_bin: Path,
-            memory_gb: int, max_files: int | None = None) -> tuple[Path, int]:
+            memory_gb: int, max_files: int | None = None,
+            repo_dir: Path | None = None) -> tuple[Path, int]:
     if memory_gb < 1 or (max_files is not None and max_files < 1):
         raise ValueError("memory_gb and max_files must be positive")
     files = sorted(path for path in npz_dir.glob("mdt_e1000MeV_gamma_cyl_HD*.npz")
@@ -39,9 +40,9 @@ def prepare(npz_dir: Path, output_dir: Path, *, python_bin: Path,
     logs.mkdir(exist_ok=True)
     manifest = output_dir / "jobs.txt"
     submit = output_dir / "delayed_gamma.sub"
-    repo = safe_path(ROOT)
+    repo = safe_path(repo_dir or ROOT)
     python_path = safe_path(python_bin)
-    worker = safe_path(ROOT / "scripts/run_delayed_npz_one.sh")
+    worker = safe_path((repo_dir or ROOT) / "scripts/run_delayed_npz_one.sh")
     with manifest.open("w", encoding="utf-8") as handle:
         for source in files:
             destination = output_dir / source.stem
@@ -73,12 +74,15 @@ def main() -> int:
     parser.add_argument("--npz-dir", type=Path, default=DEFAULT_NPZ_DIR)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "outputs/delayed_tagged_gamma_batch")
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
+    parser.add_argument("--repo-dir", type=Path, default=None,
+                        help="Exact EOS spelling of the checkout, e.g. /eos/user/a/name/LicketyFit_official")
     parser.add_argument("--memory-gb", type=int, default=64)
     parser.add_argument("--max-files", type=int, default=None,
                         help="Prepare just the first N full files for a batch pilot")
     args = parser.parse_args()
     submit, count = prepare(args.npz_dir, args.output_dir, python_bin=args.python,
-                            memory_gb=args.memory_gb, max_files=args.max_files)
+                            memory_gb=args.memory_gb, max_files=args.max_files,
+                            repo_dir=args.repo_dir)
     print(f"Prepared {count} per-file jobs: {submit}")
     print("Submit from an EosSubmit-configured CERN session with:")
     print(f"  condor_submit {submit}")

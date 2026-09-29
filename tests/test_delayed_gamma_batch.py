@@ -15,7 +15,8 @@ def test_submit_generator_excludes_small_skims_and_can_limit_pilot(tmp_path):
     output = tmp_path / "batch"
     script = Path(__file__).resolve().parents[1] / "scripts" / "prepare_delayed_gamma_batch.py"
     subprocess.run([sys.executable, str(script), "--npz-dir", str(inputs),
-                    "--output-dir", str(output), "--max-files", "1", "--memory-gb", "80"],
+                    "--output-dir", str(output), "--repo-dir", "/eos/user/a/test/LicketyFit_official",
+                    "--max-files", "1", "--memory-gb", "80"],
                    check=True, capture_output=True, text=True)
     jobs = (output / "jobs.txt").read_text(encoding="utf-8").splitlines()
     submit = (output / "delayed_gamma.sub").read_text(encoding="utf-8")
@@ -27,3 +28,5 @@ def test_submit_generator_excludes_small_skims_and_can_limit_pilot(tmp_path):
     assert "executable = " in submit
     assert "run_delayed_npz_one.sh" in submit
     assert "arguments = $(input_path)" in submit
+    assert "test\\LicketyFit_official" in submit or "test/LicketyFit_official" in submit
+    assert "home-i01" not in submit

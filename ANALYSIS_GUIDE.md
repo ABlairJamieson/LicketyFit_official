@@ -436,6 +436,7 @@ single-file pilot first:
 ```bash
 python3 scripts/prepare_delayed_gamma_batch.py \
   --max-files 1 --memory-gb 64 \
+  --repo-dir /eos/user/a/ajamieso/SWAN_projects/LicketyFitTutorial_Sep2026/LicketyFit_official \
   --output-dir outputs/delayed_tagged_gamma_batch_pilot
 condor_submit outputs/delayed_tagged_gamma_batch_pilot/delayed_gamma.sub
 condor_q "$USER"
@@ -457,7 +458,9 @@ files. The completed pilot file will be skipped because it has `analysis.done`:
 
 ```bash
 python3 scripts/prepare_delayed_gamma_batch.py \
-  --memory-gb 64 --output-dir outputs/delayed_tagged_gamma_batch_pilot
+  --memory-gb 64 \
+  --repo-dir /eos/user/a/ajamieso/SWAN_projects/LicketyFitTutorial_Sep2026/LicketyFit_official \
+  --output-dir outputs/delayed_tagged_gamma_batch_pilot
 condor_submit outputs/delayed_tagged_gamma_batch_pilot/delayed_gamma.sub
 ```
 
