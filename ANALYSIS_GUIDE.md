@@ -358,3 +358,70 @@ in the CSV and excluded from the overlay. The lines show projected
 differences; `reco_truth_distance_3d_mm` gives the actual three-dimensional
 distance. These point-source estimates can be biased by the electron's finite
 track; no containment or reconstruction-quality cut is applied yet.
+
+The vertex run also writes `delayed_vertex_residuals_xyz.png`: three signed
+histograms of reconstructed minus matched-truth `x`, `y`, and `z` in cm. Each
+panel reports its median and RMS. Only successfully fitted, time-matched
+muon-decay daughters enter the plot; the title gives that denominator. To
+replot an existing `vertices.csv` without repeating reconstruction:
+
+```bash
+python3 scripts/plot_delayed_vertex_residuals.py \
+  outputs/delayed_pion_pilot_v3/vertex_pilot/vertices.csv
+```
+
+Your `delayed_pion_pilot_v3` clustering already processed all 1,000 events
+from each of the cited pion files. Thus the fastest full-file follow-up is
+to reconstruct every candidate from those existing clusters, then draw
+separate residual panels for each primary type:
+
+```bash
+python3 scripts/reconstruct_delayed_vertices.py \
+  outputs/delayed_pion_pilot_v3/clusters.csv \
+  --output-dir outputs/delayed_pion_pilot_v3/vertices_all
+python3 scripts/plot_delayed_vertex_residuals.py \
+  outputs/delayed_pion_pilot_v3/vertices_all/vertices.csv --primary-pid 211
+python3 scripts/plot_delayed_vertex_residuals.py \
+  outputs/delayed_pion_pilot_v3/vertices_all/vertices.csv --primary-pid -211
+```
+
+To repeat clustering on the full 1,000-event pion files independently, keep
+their outputs separate:
+
+```bash
+NPZDIR=/eos/experiment/wcte/MC_Production/v1.5.1/tagged_gamma/converted_npz
+python3 scripts/study_delayed_clusters.py \
+  "$NPZDIR/mdt_wCDS_pi+_Uniform_0_800MeV_0001.npz" \
+  --max-events-per-file 1000 --output-dir outputs/delayed_pi_plus_full
+python3 scripts/reconstruct_delayed_vertices.py \
+  outputs/delayed_pi_plus_full/clusters.csv \
+  --output-dir outputs/delayed_pi_plus_full/vertices
+
+python3 scripts/study_delayed_clusters.py \
+  "$NPZDIR/mdt_wCDS_pi-_Uniform_0_800MeV_0000.npz" \
+  --max-events-per-file 1000 --output-dir outputs/delayed_pi_minus_full
+python3 scripts/reconstruct_delayed_vertices.py \
+  outputs/delayed_pi_minus_full/clusters.csv \
+  --output-dir outputs/delayed_pi_minus_full/vertices
+```
+
+For a tagged-gamma control pilot, use the existing 100-event skim first:
+
+```bash
+python3 scripts/study_delayed_clusters.py \
+  "$NPZDIR/mdt_e1000MeV_gamma_cyl_HD5_events00000-00099.npz" \
+  --max-events-per-file 100 \
+  --output-dir outputs/delayed_gamma_hd5_100
+python3 scripts/reconstruct_delayed_vertices.py \
+  outputs/delayed_gamma_hd5_100/clusters.csv \
+  --output-dir outputs/delayed_gamma_hd5_100/vertices
+```
+
+If the gamma skim has no delayed candidate, the reconstruction command writes
+empty tables and annotated plots; that is an informative count. The full
+gamma files contain 25,000 events each. The current NPZ readers decompress
+whole object-array fields even with `--max-events-per-file`, so a full gamma
+file should run as a memory-sized batch job or first be converted into smaller
+NPZ event chunks; do not assume the 100-event limit makes a 25,000-event file
+cheap to open interactively on lxplus. The 100-event control is too small to
+measure the rare pion-production population or a reliable false-tag rate.

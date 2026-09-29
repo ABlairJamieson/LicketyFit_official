@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 
 from LicketyFit.MichelVertex import fit_delayed_point_vertex, match_michel_truth  # noqa: E402
 from LicketyFit.TimeClustering import event_hit_times  # noqa: E402
+from plot_delayed_vertex_residuals import plot_residuals  # noqa: E402
 
 
 def load_pmt_positions(mapping_file: Path) -> dict[int, np.ndarray]:
@@ -124,7 +125,7 @@ def main() -> int:
     if args.max_candidates is not None:
         candidates = candidates[:args.max_candidates]
     if not candidates:
-        raise ValueError("No rank-1 delayed clusters found in the input table")
+        print("No rank-1 delayed clusters found; writing empty diagnostic outputs.")
     by_file.clear()
     for source, row in candidates:
         by_file[source].append(row)
@@ -206,11 +207,14 @@ def main() -> int:
     plot_vertices(output_rows, plot_path)
     overlay_path = output_dir / "delayed_vertices_truth_overlay.png"
     plot_truth_overlay(output_rows, overlay_path)
+    residual_path = output_dir / "delayed_vertex_residuals_xyz.png"
+    n_residuals = plot_residuals(output_rows, residual_path)
     print(f"Point fits: {dict(status_counts)}")
     print(f"Truth matches: {dict(Counter(row.get('truth_status', 'unavailable') for row in output_rows))}")
     print(f"Results: {csv_path}")
     print(f"Plot: {plot_path}")
     print(f"Truth overlay: {overlay_path}")
+    print(f"Reco - truth x/y/z residuals: {residual_path} ({n_residuals} matched events)")
     return 0
 
 

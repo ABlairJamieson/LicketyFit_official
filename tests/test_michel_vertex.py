@@ -69,6 +69,18 @@ def test_vertex_runner_reads_cluster_window_and_mapping(tmp_path):
     assert row["truth_status"] == "matched"
     assert float(row["reco_truth_distance_3d_mm"]) < 100.0
     assert (output_dir / "delayed_vertices_truth_overlay.png").is_file()
+    assert (output_dir / "delayed_vertex_residuals_xyz.png").is_file()
+    residual_script = Path(__file__).resolve().parents[1] / "scripts" / "plot_delayed_vertex_residuals.py"
+    rerendered = tmp_path / "residuals_again.png"
+    subprocess.run([sys.executable, str(residual_script), str(output_dir / "vertices.csv"),
+                    "--output", str(rerendered), "--bins", "12"],
+                   check=True, capture_output=True, text=True)
+    assert rerendered.is_file()
+    filtered = subprocess.run([sys.executable, str(residual_script),
+                               str(output_dir / "vertices.csv"), "--primary-pid", "211"],
+                              check=True, capture_output=True, text=True)
+    assert "Matched events: 1/1" in filtered.stdout
+    assert (output_dir / "delayed_vertex_residuals_xyz_pid211.png").is_file()
 
 
 def test_michel_truth_rejects_wrong_delayed_window():
@@ -96,3 +108,22 @@ def test_delayed_hit_plot_reads_rank_one_clusters(tmp_path):
     subprocess.run([sys.executable, str(script), str(events_csv), "--output", str(output)],
                    check=True, capture_output=True, text=True)
     assert output.is_file()
+
+
+def test_vertex_runner_handles_gamma_control_with_no_delayed_clusters(tmp_path):
+    mapping = np.zeros((1, 10))
+    mapping[0, 0] = 1
+    mapping_file = tmp_path / "mapping.txt"
+    np.savetxt(mapping_file, mapping)
+    clusters_csv = tmp_path / "clusters.csv"
+    with clusters_csv.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=("input_file", "event_index", "rank"))
+        writer.writeheader()
+    output_dir = tmp_path / "out"
+    script = Path(__file__).resolve().parents[1] / "scripts" / "reconstruct_delayed_vertices.py"
+    subprocess.run([sys.executable, str(script), str(clusters_csv),
+                    "--mapping-file", str(mapping_file), "--output-dir", str(output_dir)],
+                   check=True, capture_output=True, text=True)
+    with (output_dir / "vertices.csv").open(newline="", encoding="utf-8") as handle:
+        assert list(csv.DictReader(handle)) == []
+    assert (output_dir / "delayed_vertex_residuals_xyz.png").is_file()
