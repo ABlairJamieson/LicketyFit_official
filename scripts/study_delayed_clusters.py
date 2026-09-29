@@ -23,6 +23,10 @@ def main() -> int:
     parser.add_argument("inputs", nargs="+", type=Path, help="Converted WCSim NPZ files")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/delayed_clusters"))
     parser.add_argument("--max-events-per-file", type=int, default=100)
+    parser.add_argument("--all-events", action="store_true",
+                        help="Process every event in each input file (overrides the 100-event pilot default)")
+    parser.add_argument("--progress-every", type=int, default=1000,
+                        help="Print progress after this many events in each input file")
     parser.add_argument("--width-ns", type=float, default=50.0)
     parser.add_argument("--min-pmts", type=int, default=10)
     parser.add_argument("--prompt-min-pmts", type=int, default=10)
@@ -37,6 +41,10 @@ def main() -> int:
     args = parser.parse_args()
     if args.max_events_per_file is not None and args.max_events_per_file < 1:
         parser.error("--max-events-per-file must be positive")
+    if args.all_events and args.max_events_per_file != 100:
+        parser.error("Use --all-events without --max-events-per-file")
+    if args.progress_every < 1:
+        parser.error("--progress-every must be positive")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     event_fields = [
         "input_file", "event_index", "event_id", "primary_pid", "selection_category",
@@ -59,7 +67,7 @@ def main() -> int:
         for path in args.inputs:
             with np.load(path, allow_pickle=True) as data:
                 n_available = len(data["digi_hit_time"])
-                n_events = n_available if args.max_events_per_file is None else min(n_available, args.max_events_per_file)
+                n_events = n_available if args.all_events else min(n_available, args.max_events_per_file)
                 # NPZ stores an entire object-array field in one member. Keep
                 # the default pilot small for the large tagged-gamma files.
                 field_names = [name for name in ("digi_hit_time", "digi_hit_pmt", "digi_hit_charge", "digi_hit_trigger", "trigger_time", "event_id", "pid", "selection_category") if name in data.files]
@@ -102,6 +110,8 @@ def main() -> int:
                             "delta_t_ns": candidate.center_ns - prompt.center_ns, **candidate.to_dict()})
                     total += 1
                     tagged += bool(delayed)
+                    if (index + 1) % args.progress_every == 0:
+                        print(f"{path.name}: {index + 1}/{n_events} events processed", flush=True)
             print(f"{path.name}: {n_events} events", flush=True)
     print(f"Delayed clusters found in {tagged}/{total} events")
     print(f"Time conventions: {dict(conventions)}")

@@ -425,3 +425,47 @@ file should run as a memory-sized batch job or first be converted into smaller
 NPZ event chunks; do not assume the 100-event limit makes a 25,000-event file
 cheap to open interactively on lxplus. The 100-event control is too small to
 measure the rare pion-production population or a reliable false-tag rate.
+
+### Full tagged-gamma NPZ files on CERN batch
+
+The repository provides one batch job per complete `mdt_e1000MeV_gamma_cyl_HD*.npz`
+file, excluding the 100-event `_events...` skim. Start from the LicketyFit
+repository on EOS with the working virtual environment active. Prepare a
+single-file pilot first:
+
+```bash
+python3 scripts/prepare_delayed_gamma_batch.py \
+  --max-files 1 --memory-gb 64 \
+  --output-dir outputs/delayed_tagged_gamma_batch_pilot
+condor_submit outputs/delayed_tagged_gamma_batch_pilot/delayed_gamma.sub
+condor_q "$USER"
+```
+
+Use the same CERN **EosSubmit** schedd configuration that worked for the
+earlier conversion jobs; a standard schedd rejects direct `/eos` paths in
+this submit file. The generated file and all logs/output paths live on EOS.
+The job uses the currently active `python3` path, so check that this Python
+has NumPy, SciPy, and Matplotlib and is accessible on worker nodes. Check
+`outputs/delayed_tagged_gamma_batch_pilot/logs/` for stdout and stderr.
+Successful jobs create `analysis.done` inside their per-file output directory,
+alongside `clusters/events.csv`, `clusters/clusters.csv`, and `vertices/`.
+Only trust outputs with that marker: an interrupted job may leave partial CSVs.
+
+If the pilot finishes within the requested memory and the results are
+sensible, regenerate the submit list in the same output directory for all
+files. The completed pilot file will be skipped because it has `analysis.done`:
+
+```bash
+python3 scripts/prepare_delayed_gamma_batch.py \
+  --memory-gb 64 --output-dir outputs/delayed_tagged_gamma_batch_pilot
+condor_submit outputs/delayed_tagged_gamma_batch_pilot/delayed_gamma.sub
+```
+
+The generator prints the job count; at the time of writing, 13 full tagged
+gamma NPZ files were present. `--memory-gb` can be raised if a pilot job is
+killed for memory use. Each worker runs clustering with `--all-events` and
+then vertex reconstruction in a *separate Python process*. This releases the
+clustering arrays before reconstruction, but does **not** stream individual
+events out of an NPZ member: NumPy still decompresses each requested
+object-array field in full. Thus memory is bounded per file/job, not per
+event. Do not run all full gamma files concurrently on an lxplus head node.

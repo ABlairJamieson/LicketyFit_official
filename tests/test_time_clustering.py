@@ -77,3 +77,19 @@ def test_cli_reads_datatools_style_npz(tmp_path):
     assert row["n_rejected_early_digits"] == "1"
     assert row["n_delayed_clusters"] == "1"
     assert 2190 < float(row["delta_t_ns"]) < 2210
+
+
+def test_all_events_overrides_100_event_pilot_default(tmp_path):
+    arrays = {}
+    for key in ("digi_hit_time", "digi_hit_pmt", "digi_hit_charge"):
+        arrays[key] = np.empty(101, dtype=object)
+        for index in range(101):
+            arrays[key][index] = np.array([], dtype=float)
+    source = tmp_path / "gamma.npz"
+    np.savez_compressed(source, **arrays)
+    output = tmp_path / "all"
+    script = Path(__file__).resolve().parents[1] / "scripts" / "study_delayed_clusters.py"
+    subprocess.run([sys.executable, str(script), str(source), "--all-events",
+                    "--output-dir", str(output)], check=True, capture_output=True, text=True)
+    with (output / "events.csv").open(newline="", encoding="utf-8") as handle:
+        assert len(list(csv.DictReader(handle))) == 101
