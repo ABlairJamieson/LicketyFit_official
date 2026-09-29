@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from LicketyFit.MichelVertex import fit_delayed_point_vertex
+from LicketyFit.MichelVertex import fit_delayed_point_vertex, match_michel_truth
 
 
 def _synthetic_hits():
@@ -40,6 +40,10 @@ def test_vertex_runner_reads_cluster_window_and_mapping(tmp_path):
         "digi_hit_charge": np.ones(len(times)),
         "digi_hit_trigger": np.zeros(len(times), dtype=int),
         "trigger_time": np.array([0.0]),
+        "track_pid": np.array([211, -13, -11]),
+        "track_parent": np.array([0, 211, -13]),
+        "track_start_time": np.array([0.0, 15.0, 2000.0]),
+        "track_start_position": np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0], truth / 10.0]),
     }.items():
         arrays[name] = np.empty(1, dtype=object)
         arrays[name][0] = values
@@ -61,7 +65,18 @@ def test_vertex_runner_reads_cluster_window_and_mapping(tmp_path):
     estimate = np.array([float(row[key]) for key in ("x_mm", "y_mm", "z_mm")])
     assert row["status"] == "ok"
     assert np.linalg.norm(estimate - truth) < 100.0
-    assert (output_dir / "delayed_vertices_rz.png").is_file()
+    assert (output_dir / "delayed_vertices_tank_ry.png").is_file()
+    assert row["truth_status"] == "matched"
+    assert float(row["reco_truth_distance_3d_mm"]) < 100.0
+    assert (output_dir / "delayed_vertices_truth_overlay.png").is_file()
+
+
+def test_michel_truth_rejects_wrong_delayed_window():
+    event = {"track_pid": [-11, -13, 211], "track_parent": [-13, 211, 0],
+             "track_start_time": [2000.0, 15.0, 0.0],
+             "track_start_position": [[12.0, -8.0, 20.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]}
+    assert match_michel_truth(event, 2000.0)["status"] == "matched"
+    assert match_michel_truth(event, 900.0)["status"] == "time_mismatch"
 
 
 def test_delayed_hit_plot_reads_rank_one_clusters(tmp_path):

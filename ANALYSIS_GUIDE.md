@@ -345,8 +345,16 @@ This uses the existing point multilateration seed on digits inside the saved
 cluster window. The PMT coordinates come from `tables/wcsim_wcte_mapping.txt`
 in WCSim centimetres, converted to millimetres; the separate design-geometry
 file has a different origin and would bias these WCSim vertex estimates.
-`vertices.csv` records failures and timing residuals. The PNG shows beam-axis
-`r=sqrt(x^2+y^2)` versus `z`, and the tank's cylindrical radius
-`R=sqrt(x^2+z^2)` versus vertical `y`. These point-source estimates can be
-biased by a Michel positron's finite track; no containment or quality cut is
-applied to the plot yet.
+`vertices.csv` records failures and timing residuals. The reco-only PNG,
+`delayed_vertices_tank_ry.png`, shows
+the tank's cylindrical radius `R=sqrt(x^2+z^2)` versus vertical `y`, plus an
+`x,z` cross-section. The second PNG, `delayed_vertices_truth_overlay.png`,
+marks the production point of a truth muon-decay electron or positron with an
+`x` and links it to the reconstructed point. Matches require the daughter
+track time relative to the earliest primary track to agree with the measured
+prompt-to-delayed-cluster separation within 100 ns (adjustable with
+`--truth-match-tolerance-ns`). Unmatched and missing-truth events are reported
+in the CSV and excluded from the overlay. The lines show projected
+differences; `reco_truth_distance_3d_mm` gives the actual three-dimensional
+distance. These point-source estimates can be biased by the electron's finite
+track; no containment or reconstruction-quality cut is applied yet.

@@ -49,3 +49,48 @@ def fit_delayed_point_vertex(
     )
     result["n_window_pmts"] = int(len(unique_ids))
     return result
+
+
+def match_michel_truth(event: dict, delta_t_ns: float, *, tolerance_ns: float = 100.0) -> dict:
+    """Match a delayed cluster to a muon-decay e+/e- track by relative time.
+
+    DataTools stores WCSim track positions in cm and ``track_parent`` as the
+    parent's PDG code, not its track ID.  This can identify a muon daughter,
+    but cannot prove which individual muon produced it.  Relative times use
+    the earliest primary track as the event reference and need validation on
+    each simulation production before interpreting match efficiency.
+    """
+    required = ("track_pid", "track_parent", "track_start_time", "track_start_position")
+    if any(key not in event for key in required):
+        return {"status": "missing_truth"}
+    pids = np.asarray(event["track_pid"], dtype=int).reshape(-1)
+    parents = np.asarray(event["track_parent"], dtype=int).reshape(-1)
+    times = np.asarray(event["track_start_time"], dtype=float).reshape(-1)
+    positions_cm = np.asarray(event["track_start_position"], dtype=float)
+    if not (len(pids) == len(parents) == len(times)) or positions_cm.shape != (len(pids), 3):
+        return {"status": "invalid_truth_shapes"}
+    if not len(times) or not np.isfinite(delta_t_ns):
+        return {"status": "invalid_truth_time"}
+    finite = np.isfinite(times) & np.all(np.isfinite(positions_cm), axis=1)
+    primary = finite & (parents == 0)
+    if not np.any(primary):
+        return {"status": "no_primary_time"}
+    t_reference = float(np.min(times[primary]))
+    daughter = finite & (((pids == -11) & (parents == -13)) |
+                         ((pids == 11) & (parents == 13)))
+    indices = np.flatnonzero(daughter)
+    if not len(indices):
+        return {"status": "no_muon_decay_electron", "n_truth_candidates": 0}
+    delays = times[indices] - t_reference
+    offsets = np.abs(delays - delta_t_ns)
+    best = int(np.argmin(offsets))
+    index = int(indices[best])
+    result = {"status": "matched" if offsets[best] <= tolerance_ns else "time_mismatch",
+              "n_truth_candidates": int(len(indices)),
+              "truth_track_index": index,
+              "truth_pdg": int(pids[index]),
+              "truth_delay_ns": float(delays[best]),
+              "truth_delay_difference_ns": float(offsets[best])}
+    if result["status"] == "matched":
+        result["truth_vertex_mm"] = positions_cm[index] * 10.0
+    return result
