@@ -281,6 +281,10 @@ is absent, the output marks `raw_missing_trigger_metadata`; inspect this
 before interpreting microsecond delays. `--time-mode raw` is provided for
 an explicit comparison. The CSV records the timing mode, number of triggers,
 and observed digit span for each event.
+The default also rejects times before -1 ms, because the pion pilot contained
+digits near -214,748,368 ns that formed false prompt anchors. The number of
+rejected digits is reported per event; use `--min-time-ns` to change this
+boundary when the input has a different clock convention.
 
 First inspect the `delta_t_ns` distribution and the rate of candidate bursts
 in each pion sample. Then compare with no-pion tagged-gamma events to choose

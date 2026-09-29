@@ -29,6 +29,10 @@ def main() -> int:
     parser.add_argument("--start-ns", type=float, default=200.0)
     parser.add_argument("--end-ns", type=float, default=10_000.0)
     parser.add_argument("--prompt-search-ns", type=float, default=200.0)
+    parser.add_argument(
+        "--min-time-ns", type=float, default=-1_000_000.0,
+        help="Reject digits earlier than this common-clock time (default: %(default)g ns)",
+    )
     parser.add_argument("--time-mode", choices=("auto", "raw", "trigger-plus"), default="auto")
     args = parser.parse_args()
     if args.max_events_per_file is not None and args.max_events_per_file < 1:
@@ -36,7 +40,7 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     event_fields = [
         "input_file", "event_index", "event_id", "primary_pid", "selection_category",
-        "time_mode", "n_digits", "n_triggers", "time_span_ns", "prompt_time_ns",
+        "time_mode", "n_digits", "n_rejected_early_digits", "n_triggers", "time_span_ns", "prompt_time_ns",
         "prompt_pmts", "prompt_charge", "n_delayed_clusters", "best_delayed_time_ns",
         "delta_t_ns", "best_delayed_pmts", "best_delayed_charge",
     ]
@@ -46,6 +50,7 @@ def main() -> int:
     total = tagged = 0
     conventions: Counter[str] = Counter()
     short_observed_spans = 0
+    rejected_early_digits = 0
     with events_path.open("w", newline="", encoding="utf-8") as event_file, clusters_path.open("w", newline="", encoding="utf-8") as cluster_file:
         events = csv.DictWriter(event_file, fieldnames=event_fields)
         clusters = csv.DictWriter(cluster_file, fieldnames=cluster_fields)
@@ -63,9 +68,14 @@ def main() -> int:
                     event = {name: fields[name][index] for name in field_names}
                     times, convention = event_hit_times(event, args.time_mode)
                     conventions[convention] += 1
-                    short_observed_spans += bool(len(times) and np.ptp(times) < args.end_ns)
                     pmts = np.asarray(event["digi_hit_pmt"], dtype=int).reshape(-1)
                     charge = np.asarray(event["digi_hit_charge"], dtype=float).reshape(-1)
+                    n_raw_digits = len(times)
+                    keep = np.isfinite(times) & (times >= args.min_time_ns)
+                    n_rejected = int(np.count_nonzero(~keep))
+                    rejected_early_digits += n_rejected
+                    times, pmts, charge = times[keep], pmts[keep], charge[keep]
+                    short_observed_spans += bool(len(times) and np.ptp(times) < args.end_ns)
                     prompt, delayed = find_delayed_clusters(times, pmts, charge, width_ns=args.width_ns, min_pmts=args.min_pmts, prompt_min_pmts=args.prompt_min_pmts, search_start_ns=args.start_ns, search_end_ns=args.end_ns, prompt_search_ns=args.prompt_search_ns)
                     best = delayed[0] if delayed else None
                     row = {
@@ -73,7 +83,8 @@ def main() -> int:
                         "event_id": event.get("event_id", index),
                         "primary_pid": event.get("pid", ""),
                         "selection_category": event.get("selection_category", ""),
-                        "time_mode": convention, "n_digits": len(times),
+                        "time_mode": convention, "n_digits": n_raw_digits,
+                        "n_rejected_early_digits": n_rejected,
                         "n_triggers": len(np.asarray(event.get("trigger_time", [])).reshape(-1)),
                         "time_span_ns": float(np.ptp(times)) if len(times) else "",
                         "prompt_time_ns": prompt.center_ns if prompt else "",
@@ -94,6 +105,7 @@ def main() -> int:
             print(f"{path.name}: {n_events} events", flush=True)
     print(f"Delayed clusters found in {tagged}/{total} events")
     print(f"Time conventions: {dict(conventions)}")
+    print(f"Rejected early/nonfinite digits: {rejected_early_digits}")
     print(f"Observed digit span < {args.end_ns:g} ns: {short_observed_spans}/{total} events")
     print("Digit span is not a readout-coverage measure; check trigger/readout settings before interpreting missing clusters.")
     print(f"Event table: {events_path}")

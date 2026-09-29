@@ -58,10 +58,10 @@ def test_one_pmt_with_many_digits_does_not_pass_threshold():
 def test_cli_reads_datatools_style_npz(tmp_path):
     arrays = {}
     for key, values in {
-        "digi_hit_time": np.concatenate((100 + np.arange(12), 100 + np.arange(11))),
-        "digi_hit_pmt": np.arange(23),
-        "digi_hit_charge": np.ones(23),
-        "digi_hit_trigger": np.concatenate((np.zeros(12, dtype=int), np.ones(11, dtype=int))),
+        "digi_hit_time": np.concatenate(([-214_749_368.0], 100 + np.arange(12), 100 + np.arange(11))),
+        "digi_hit_pmt": np.arange(24),
+        "digi_hit_charge": np.ones(24),
+        "digi_hit_trigger": np.concatenate((np.zeros(13, dtype=int), np.ones(11, dtype=int))),
         "trigger_time": np.array([1000.0, 3200.0]),
     }.items():
         arrays[key] = np.empty(1, dtype=object)
@@ -74,5 +74,6 @@ def test_cli_reads_datatools_style_npz(tmp_path):
     with (output / "events.csv").open(newline="", encoding="utf-8") as handle:
         row = next(csv.DictReader(handle))
     assert row["time_mode"] == "trigger_plus"
+    assert row["n_rejected_early_digits"] == "1"
     assert row["n_delayed_clusters"] == "1"
     assert 2190 < float(row["delta_t_ns"]) < 2210
