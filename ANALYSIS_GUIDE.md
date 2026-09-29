@@ -294,3 +294,16 @@ produce mu- that captures on oxygen. A candidate is evidence for a delayed
 muon decay, not by itself proof that a pion was produced. Confirm that WCSim
 retained hits over the intended delayed search interval before using the
 absence of a candidate as a negative tag.
+
+Plot the strongest delayed candidate per event using 100 bins between 100
+and 6100 ns (60 ns per bin), with separate panels for pi+ and pi-:
+
+```bash
+python3 scripts/plot_delayed_times.py \
+  outputs/delayed_pion_pilot_v3/events.csv \
+  --output outputs/delayed_pion_pilot_v3/delayed_time_histogram.png
+```
+
+The plot title for each panel gives the total number of candidates and the
+number falling inside the displayed range. This is a candidate timing plot,
+not a fitted lifetime or truth-matched decay measurement.
