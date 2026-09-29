@@ -246,3 +246,46 @@ python3 scripts/analyze_pion_shower_results.py \
 The balanced sample is for conditional separation studies. It does not reflect
 the very low pion prior in the tagged-gamma beam, so efficiency and background
 rejection should be reported separately from expected beam purity.
+
+## Delayed Michel-electron pilot
+
+`scripts/study_delayed_clusters.py` searches raw digit times for a prompt burst
+and later bursts using a sliding 50 ns window. It counts distinct PMTs and
+reports every candidate in `clusters.csv` plus the strongest candidate in
+`events.csv`. No fitter, geometry file, or truth labels are required. This is
+an exploratory pi+ decay tag; it is not an all-pion selection.
+
+On CERN, from the LicketyFit repository with its Python environment active:
+
+```bash
+NPZDIR=/eos/experiment/wcte/MC_Production/v1.5.1/tagged_gamma/converted_npz
+python3 scripts/study_delayed_clusters.py \
+  "$NPZDIR/mdt_wCDS_pi+_Uniform_0_800MeV_0001.npz" \
+  "$NPZDIR/mdt_wCDS_pi-_Uniform_0_800MeV_0000.npz" \
+  --max-events-per-file 1000 \
+  --output-dir outputs/delayed_pion_pilot
+```
+
+Check the actual filenames first; the pi+ and pi- production file numbers may
+differ. The default requires 10 distinct PMTs in a 50 ns window from 200 ns
+to 10 us after the prompt cluster. Try `--width-ns 20` and a range of
+`--min-pmts` values after inspecting the pilot distributions. The prompt
+cluster is selected from the first 200 ns of observed light. Candidate
+`delta_t_ns` uses the median digit time in each cluster.
+
+In `--time-mode auto`, digit times are placed on a common clock by adding
+`trigger_time[digi_hit_trigger]` when both arrays are present. This follows
+the WCSim digit-time definition (relative to the trigger header). If metadata
+is absent, the output marks `raw_missing_trigger_metadata`; inspect this
+before interpreting microsecond delays. `--time-mode raw` is provided for
+an explicit comparison. The CSV records the timing mode, number of triggers,
+and observed digit span for each event.
+
+First inspect the `delta_t_ns` distribution and the rate of candidate bursts
+in each pion sample. Then compare with no-pion tagged-gamma events to choose
+a PMT threshold from measured accidental/background rates. A mu+ Michel
+population should show a delay scale near 2.2 us; pi- can also be absorbed or
+produce mu- that captures on oxygen. A candidate is evidence for a delayed
+muon decay, not by itself proof that a pion was produced. Confirm that WCSim
+retained hits over the intended delayed search interval before using the
+absence of a candidate as a negative tag.
