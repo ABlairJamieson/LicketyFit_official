@@ -295,8 +295,8 @@ muon decay, not by itself proof that a pion was produced. Confirm that WCSim
 retained hits over the intended delayed search interval before using the
 absence of a candidate as a negative tag.
 
-Plot the strongest delayed candidate per event using 100 bins between 100
-and 6100 ns (60 ns per bin), with separate panels for pi+ and pi-:
+Plot the strongest delayed candidate per event using 30 bins between 100
+and 6100 ns (200 ns per bin), with separate panels for pi+ and pi-:
 
 ```bash
 python3 scripts/plot_delayed_times.py \
@@ -306,4 +306,10 @@ python3 scripts/plot_delayed_times.py \
 
 The plot title for each panel gives the total number of candidates and the
 number falling inside the displayed range. This is a candidate timing plot,
-not a fitted lifetime or truth-matched decay measurement.
+not a truth-matched decay measurement. The pi+ panel also shows an unbinned
+truncated-exponential plus flat-background fit over 500–6100 ns. Its printed
+profile-likelihood interval includes statistical uncertainty only. The
+result is an *apparent* delay constant until the trigger/readout efficiency
+versus delay and non-Michel backgrounds are measured. Pass `--bins 60` for
+100 ns bins, `--fit-min-ns` to adjust the fitted interval, or `--no-fit` to
+show the histograms alone.
