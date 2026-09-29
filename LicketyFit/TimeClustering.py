@@ -89,6 +89,28 @@ def _best_window(
     )
 
 
+def _first_coincidence_end(
+    times: np.ndarray, pmts: np.ndarray, width_ns: float, min_pmts: int,
+) -> float | None:
+    """Find the first sliding window with enough distinct PMTs."""
+    order = np.argsort(times, kind="stable")
+    t, p = times[order], pmts[order]
+    left = 0
+    counts: dict[int, int] = {}
+    for right in range(t.size):
+        key = int(p[right])
+        counts[key] = counts.get(key, 0) + 1
+        while t[right] - t[left] > width_ns:
+            key = int(p[left])
+            counts[key] -= 1
+            if counts[key] == 0:
+                del counts[key]
+            left += 1
+        if len(counts) >= min_pmts:
+            return float(t[right])
+    return None
+
+
 def find_delayed_clusters(
     times_ns: np.ndarray,
     pmts: np.ndarray,
@@ -96,6 +118,7 @@ def find_delayed_clusters(
     *,
     width_ns: float = 50.0,
     min_pmts: int = 10,
+    prompt_min_pmts: int = 10,
     search_start_ns: float = 200.0,
     search_end_ns: float = 10_000.0,
     prompt_search_ns: float = 200.0,
@@ -107,8 +130,8 @@ def find_delayed_clusters(
     must check that the simulation readout actually covers the search interval.
     This method does not correct hit times for photon flight time.
     """
-    if width_ns <= 0 or min_pmts < 1 or max_clusters < 1:
-        raise ValueError("width_ns, min_pmts, and max_clusters must be positive")
+    if width_ns <= 0 or min_pmts < 1 or prompt_min_pmts < 1 or max_clusters < 1:
+        raise ValueError("width_ns, min_pmts, prompt_min_pmts, and max_clusters must be positive")
     if search_start_ns < 0 or search_end_ns <= search_start_ns or prompt_search_ns <= 0:
         raise ValueError("invalid delayed search interval")
     times = np.asarray(times_ns, dtype=float).reshape(-1)
@@ -118,9 +141,13 @@ def find_delayed_clusters(
         raise ValueError("hit arrays have different lengths")
     good = np.isfinite(times) & np.isfinite(charge) & (charge > 0)
     times, ids, charge = times[good], ids[good], charge[good]
-    # Anchor the prompt search to the first light in the event. A Michel
-    # electron can be brighter than the pion/muon that preceded it.
-    early = times <= np.min(times) + prompt_search_ns if times.size else np.zeros(0, dtype=bool)
+    # Isolated early noise hits cannot define t0. Anchor to the first actual
+    # coincidence, then find the densest prompt window nearby. A Michel
+    # electron can be brighter than its preceding pion/muon light.
+    anchor = _first_coincidence_end(times, ids, width_ns, prompt_min_pmts)
+    if anchor is None:
+        return None, []
+    early = (times >= anchor - width_ns) & (times <= anchor + prompt_search_ns)
     prompt = _best_window(times[early], ids[early], charge[early], width_ns)
     if prompt is None:
         return None, []

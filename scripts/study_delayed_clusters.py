@@ -25,6 +25,7 @@ def main() -> int:
     parser.add_argument("--max-events-per-file", type=int, default=100)
     parser.add_argument("--width-ns", type=float, default=50.0)
     parser.add_argument("--min-pmts", type=int, default=10)
+    parser.add_argument("--prompt-min-pmts", type=int, default=10)
     parser.add_argument("--start-ns", type=float, default=200.0)
     parser.add_argument("--end-ns", type=float, default=10_000.0)
     parser.add_argument("--prompt-search-ns", type=float, default=200.0)
@@ -65,7 +66,7 @@ def main() -> int:
                     short_observed_spans += bool(len(times) and np.ptp(times) < args.end_ns)
                     pmts = np.asarray(event["digi_hit_pmt"], dtype=int).reshape(-1)
                     charge = np.asarray(event["digi_hit_charge"], dtype=float).reshape(-1)
-                    prompt, delayed = find_delayed_clusters(times, pmts, charge, width_ns=args.width_ns, min_pmts=args.min_pmts, search_start_ns=args.start_ns, search_end_ns=args.end_ns, prompt_search_ns=args.prompt_search_ns)
+                    prompt, delayed = find_delayed_clusters(times, pmts, charge, width_ns=args.width_ns, min_pmts=args.min_pmts, prompt_min_pmts=args.prompt_min_pmts, search_start_ns=args.start_ns, search_end_ns=args.end_ns, prompt_search_ns=args.prompt_search_ns)
                     best = delayed[0] if delayed else None
                     row = {
                         "input_file": str(path), "event_index": index,

@@ -270,7 +270,8 @@ Check the actual filenames first; the pi+ and pi- production file numbers may
 differ. The default requires 10 distinct PMTs in a 50 ns window from 200 ns
 to 10 us after the prompt cluster. Try `--width-ns 20` and a range of
 `--min-pmts` values after inspecting the pilot distributions. The prompt
-cluster is selected from the first 200 ns of observed light. Candidate
+cluster is selected near the first 10-PMT coincidence (`--prompt-min-pmts`),
+ignoring isolated early noise hits. Candidate
 `delta_t_ns` uses the median digit time in each cluster.
 
 In `--time-mode auto`, digit times are placed on a common clock by adding

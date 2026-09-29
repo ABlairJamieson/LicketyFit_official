@@ -27,6 +27,16 @@ def test_prompt_is_first_burst_even_when_delayed_is_brighter():
     assert later[0].n_pmts == 20
 
 
+def test_isolated_early_hit_does_not_turn_prompt_into_delayed_candidate():
+    times = np.concatenate(([-1400.0], 10 + np.arange(300) / 10, 2200 + np.arange(12))).astype(float)
+    ids = np.arange(len(times))
+    first, later = find_delayed_clusters(times, ids, np.ones(len(times)), min_pmts=10)
+    assert first.n_pmts >= 10
+    assert 10 <= first.center_ns < 200
+    assert len(later) == 1
+    assert 2000 < later[0].center_ns - first.center_ns < 2200
+
+
 def test_trigger_relative_digits_are_combined_on_common_clock():
     event = {
         "digi_hit_time": np.array([100.0, 100.0]),
