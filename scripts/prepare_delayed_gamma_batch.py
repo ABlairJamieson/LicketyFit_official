@@ -8,7 +8,11 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+# Do not call resolve() here.  On CERN EOS, /eos/user/... can resolve through
+# a /eos/home-* alias which is not accepted by the EosSubmit parser even
+# though it refers to the same storage.  Preserve the path spelling used by
+# the caller (normally /eos/user/<initial>/<account>/...).
+ROOT = Path(__file__).absolute().parents[1]
 DEFAULT_NPZ_DIR = Path("/eos/experiment/wcte/MC_Production/v1.5.1/tagged_gamma/converted_npz")
 
 
