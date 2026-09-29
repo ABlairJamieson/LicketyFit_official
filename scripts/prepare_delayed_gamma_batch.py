@@ -50,8 +50,10 @@ def prepare(npz_dir: Path, output_dir: Path, *, python_bin: Path,
         "\n".join([
             "# Submit on a CERN EosSubmit schedd: all paths below are on EOS.",
             "universe = vanilla",
-            "executable = /bin/bash",
-            f"arguments = {worker} $(input_path) $(output_path) {repo} {python_path}",
+            # EosSubmit requires the executable itself to be on EOS.  The
+            # worker has a bash shebang and is marked executable in Git.
+            f"executable = {worker}",
+            f"arguments = $(input_path) $(output_path) {repo} {python_path}",
             f"output = {safe_path(logs)}/$(ClusterId).$(ProcId).out",
             f"error = {safe_path(logs)}/$(ClusterId).$(ProcId).err",
             f"log = {safe_path(logs)}/$(ClusterId).log",

@@ -24,4 +24,6 @@ def test_submit_generator_excludes_small_skims_and_can_limit_pilot(tmp_path):
     assert "_events" not in jobs[0]
     assert "request_memory = 80 GB" in submit
     assert "queue input_path,output_path from" in submit
-    assert "executable = /bin/bash" in submit
+    assert "executable = " in submit
+    assert "run_delayed_npz_one.sh" in submit
+    assert "arguments = $(input_path)" in submit
