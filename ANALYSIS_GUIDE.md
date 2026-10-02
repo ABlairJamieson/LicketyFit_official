@@ -327,6 +327,22 @@ The hit and charge distributions can guide a possible high-light cut, but
 their relation to Michel energy also depends on the event position and PMT
 coverage. Keep any cut exploratory until a no-pion control is measured.
 
+For a large real-data event table, use the streaming three-panel diagnostic
+instead. It needs only `events.csv` (not the NPZ parts or `clusters.csv`) and
+does not attempt a pion-specific lifetime fit:
+
+```bash
+python3 scripts/plot_delayed_candidate_checks.py \
+  outputs/delayed_R1827/events.csv
+```
+
+This writes `outputs/delayed_R1827/delayed_candidate_checks.png` and prints
+the candidate fraction and time-convention counts. The PMT and charge panels
+clip their upper 0.5% for readability and report the clipped counts. For real
+data, a delayed-cluster candidate is not a Michel identification: check the
+readout/trigger timing and compare a suitable control sample before drawing
+physics conclusions.
+
 To estimate the effective light origin of each best delayed cluster, first
 try 20 candidates, then omit `--max-candidates` for all candidates:
 
