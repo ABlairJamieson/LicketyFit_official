@@ -483,6 +483,21 @@ This skips incomplete jobs and preserves any plots already present. Use
 `--force` only if you intend to replace the existing plots. The backfill does
 not change `analysis.done` or recompute the event tables.
 
+To sum the completed tagged-gamma files into one timing histogram and one
+digit-hit/PMT/charge figure, run:
+
+```bash
+python3 scripts/plot_delayed_batch_summary.py outputs/delayed_tagged_gamma_batch_all
+```
+
+The batch directory then contains `combined_delayed_time_histogram.png`,
+`combined_delayed_cluster_hits.png`, and `combined_summary.json`. The JSON
+records the contributing folders and event/candidate counts. The timing plot
+uses 200 ns bins from 200 to 10,000 ns by default and reports raw summed
+candidate counts. It does not normalize each file or fit a muon lifetime.
+Only folders with `analysis.done` and both cluster CSVs contribute; rerun the
+command when more batch jobs finish.
+
 If the pilot finishes within the requested memory and the results are
 sensible, regenerate the submit list in the same output directory for all
 files. The completed pilot file will be skipped because it has `analysis.done`:

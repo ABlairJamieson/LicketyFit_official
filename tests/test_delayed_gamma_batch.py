@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import runpy
 from pathlib import Path
 
 
@@ -52,3 +53,32 @@ def test_plot_backfill_handles_completed_job_without_candidates(tmp_path):
     second = subprocess.run([sys.executable, str(script), str(tmp_path)],
                             check=True, capture_output=True, text=True)
     assert "kept 2 existing plots" in second.stdout
+
+
+def test_combined_batch_counts_each_completed_folder_once(tmp_path):
+    script = Path(__file__).resolve().parents[1] / "scripts" / "plot_delayed_batch_summary.py"
+    collect_batch = runpy.run_path(str(script))["collect_batch"]
+    for name, delay in (("HD1", "1000"), ("HD2", "2200")):
+        job = tmp_path / name
+        clusters = job / "clusters"
+        clusters.mkdir(parents=True)
+        (job / "analysis.done").touch()
+        (clusters / "events.csv").write_text(
+            "input_file,event_index,primary_pid,delta_t_ns\n"
+            f"{name}.npz,0,22,{delay}\n"
+            f"{name}.npz,1,22,\n", encoding="utf-8"
+        )
+        (clusters / "clusters.csv").write_text(
+            "input_file,event_index,rank,n_hits,n_pmts,charge\n"
+            f"{name}.npz,0,1,40,35,100\n", encoding="utf-8"
+        )
+    incomplete = tmp_path / "unfinished" / "clusters"
+    incomplete.mkdir(parents=True)
+    (incomplete / "events.csv").write_text("delta_t_ns\n500\n", encoding="utf-8")
+    (incomplete / "clusters.csv").write_text("rank,n_hits,n_pmts,charge\n1,1,1,1\n", encoding="utf-8")
+    result = collect_batch(tmp_path)
+    assert result["event_count"] == 4
+    assert result["candidate_count"] == 2
+    assert result["delays_ns"] == [1000.0, 2200.0]
+    assert result["n_hits"] == [40.0, 40.0]
+    assert len(result["folders"]) == 2
