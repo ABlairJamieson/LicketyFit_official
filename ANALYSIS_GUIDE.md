@@ -314,6 +314,32 @@ versus delay and non-Michel backgrounds are measured. Pass `--bins 60` for
 100 ns bins, `--fit-min-ns` to adjust the fitted interval, or `--no-fit` to
 show the histograms alone.
 
+For the five-bin, 1000–6100 ns follow-up, audit the *same rank-1 candidates*
+against the WCSim pion → muon → positron track times:
+
+```bash
+python3 scripts/audit_delayed_michel_truth.py \
+  outputs/delayed_pion_pilot_v3/events.csv \
+  --min-ns 1000 --max-ns 6100 --bins 5 \
+  --output-dir outputs/delayed_pion_pilot_v3/michel_truth_audit
+```
+
+`delay_bin_metrics.csv` and `.png` give, per half-open delay bin, rank-1
+efficiency = time-matched rank-1 candidates / uniquely identified truth
+Michel decays, binned by *truth* positron time relative to the earliest
+primary track. The timing-match fraction (a **purity proxy**, not hit-level
+purity) is matched rank-1 candidates / all rank-1 candidates with
+classifiable truth, binned by *reconstructed* prompt-to-delayed time. The
+default match tolerance is ±100 ns, following the vertex study. Wilson 68%
+intervals are shown; empty denominators remain undefined. `events_truth_audit.csv`
+records every event's classification and time difference; `summary.json`
+reports missing or ambiguous truth separately. `truth_muon_lifetimes.png`
+plots the available muon-to-positron track times against a 2.197 µs
+reference. Check the track-time and PMT-time origins, and simulation readout
+coverage, before treating these as detector efficiencies. `track_parent`
+encodes a parent PDG rather than a unique track ID, so events with multiple
+possible muons or positrons are excluded.
+
 Inspect the size of the best delayed burst with separate distributions of
 digit hits, distinct hit PMTs, and total digit charge:
 
