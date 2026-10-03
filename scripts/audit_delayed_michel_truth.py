@@ -43,7 +43,9 @@ def wilson_68(successes: int, trials: int) -> tuple[float | None, float | None, 
     denominator = 1.0 + z2 / trials
     center = (p + z2 / (2 * trials)) / denominator
     half = np.sqrt(p * (1 - p) / trials + z2 / (4 * trials * trials)) / denominator
-    return p, max(0.0, center - half), min(1.0, center + half)
+    # Roundoff at p=0 or p=1 can otherwise put an endpoint infinitesimally
+    # beyond the observed fraction, which Matplotlib rejects as negative yerr.
+    return p, min(p, max(0.0, center - half)), max(p, min(1.0, center + half))
 
 
 def truth_times(event: dict) -> dict:
@@ -199,7 +201,8 @@ def plot_bins(bins: list[dict], output: Path) -> None:
             y = np.array([bins[i][key] for i in valid])
             lower = np.array([bins[i][low] for i in valid])
             upper = np.array([bins[i][high] for i in valid])
-            axes[1].errorbar(centers[valid], y, yerr=[y - lower, upper - y],
+            axes[1].errorbar(centers[valid], y,
+                             yerr=[np.maximum(0.0, y - lower), np.maximum(0.0, upper - y)],
                              fmt="o-", capsize=3, color=color, label=label)
     axes[1].set(xlabel="Delay after primary / prompt (ns); see timing-origin caveat",
                 ylabel="Fraction", ylim=(-0.05, 1.05))

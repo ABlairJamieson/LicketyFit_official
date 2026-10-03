@@ -1,4 +1,5 @@
 import csv
+import importlib.util
 import json
 import subprocess
 import sys
@@ -8,6 +9,15 @@ import numpy as np
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "audit_delayed_michel_truth.py"
+
+
+def test_wilson_interval_contains_boundary_fractions():
+    spec = importlib.util.spec_from_file_location("audit_delayed_michel_truth", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    for successes, trials in ((0, 6), (6, 6), (10, 10), (3, 10)):
+        value, low, high = module.wilson_68(successes, trials)
+        assert low <= value <= high
 
 
 def _object_events(events):
