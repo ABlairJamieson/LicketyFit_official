@@ -17,6 +17,7 @@ __pycache__/
 .cache/
 .venv/
 .pytest_cache/
+/.path-test-tmp/
 .ipynb_checkpoints/
 
 # Configuration-dependent caches and their temporary files

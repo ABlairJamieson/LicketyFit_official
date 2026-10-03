@@ -38,8 +38,6 @@ def main() -> int:
             group = labels.get((row["input_file"], row["event_index"]), "unknown")
             for key in ("n_hits", "n_pmts", "charge"):
                 values[group][key].append(float(row[key]))
-    if not values:
-        raise ValueError("No rank-1 delayed clusters found")
     fig, axes = plt.subplots(3, 1, figsize=(8, 10), constrained_layout=True)
     display = (("n_hits", "Digit hits in delayed cluster"),
                ("n_pmts", "Distinct PMTs in delayed cluster"),
@@ -47,7 +45,7 @@ def main() -> int:
     colors = {"211": "#1f77b4", "-211": "#d95f02", "22": "#3a923a"}
     names = {"211": r"$\pi^+$", "-211": r"$\pi^-$", "22": r"$\gamma$"}
     for axis, (key, xlabel) in zip(axes, display):
-        maximum = max(max(group[key]) for group in values.values() if group[key])
+        maximum = max((max(group[key]) for group in values.values() if group[key]), default=1.0)
         edges = np.linspace(0, max(1.0, maximum * 1.01), args.bins + 1)
         for group in sorted(values):
             data = values[group][key]
@@ -57,7 +55,11 @@ def main() -> int:
         axis.set_xlabel(xlabel)
         axis.set_ylabel("Candidates / bin")
         axis.grid(alpha=0.2)
-        axis.legend()
+        if values:
+            axis.legend()
+        else:
+            axis.text(0.5, 0.5, "No delayed-cluster candidates", transform=axis.transAxes,
+                      ha="center", va="center")
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=180)
     plt.close(fig)

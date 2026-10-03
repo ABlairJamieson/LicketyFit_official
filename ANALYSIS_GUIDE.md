@@ -465,8 +465,23 @@ The job uses the currently active `python3` path, so check that this Python
 has NumPy, SciPy, and Matplotlib and is accessible on worker nodes. Check
 `outputs/delayed_tagged_gamma_batch_pilot/logs/` for stdout and stderr.
 Successful jobs create `analysis.done` inside their per-file output directory,
-alongside `clusters/events.csv`, `clusters/clusters.csv`, and `vertices/`.
+alongside `clusters/events.csv`, `clusters/clusters.csv`, `vertices/`,
+`delayed_time_histogram.png`, and `delayed_cluster_hits.png`. The timing
+histogram uses `--no-fit` for the tagged-gamma control sample; it shows the
+delay distribution without interpreting it as a muon lifetime. The hit plot
+shows digit hits, distinct PMTs, and charge for rank-1 delayed clusters.
 Only trust outputs with that marker: an interrupted job may leave partial CSVs.
+
+For jobs that finished before these plots were added, use the CSVs already on
+EOS to make the missing PNGs without rerunning clustering or vertex fitting:
+
+```bash
+python3 scripts/plot_delayed_batch_results.py outputs/delayed_tagged_gamma_batch_all
+```
+
+This skips incomplete jobs and preserves any plots already present. Use
+`--force` only if you intend to replace the existing plots. The backfill does
+not change `analysis.done` or recompute the event tables.
 
 If the pilot finishes within the requested memory and the results are
 sensible, regenerate the submit list in the same output directory for all

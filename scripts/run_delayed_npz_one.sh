@@ -30,9 +30,17 @@ echo "Output: $output_dir"
     --all-events --output-dir "$output_dir/clusters"
 "$python_bin" scripts/reconstruct_delayed_vertices.py \
     "$output_dir/clusters/clusters.csv" --output-dir "$output_dir/vertices"
+"$python_bin" scripts/plot_delayed_times.py \
+    "$output_dir/clusters/events.csv" --no-fit \
+    --output "$output_dir/delayed_time_histogram.png"
+"$python_bin" scripts/plot_delayed_cluster_hits.py \
+    "$output_dir/clusters/events.csv" \
+    --output "$output_dir/delayed_cluster_hits.png"
 
 test -s "$output_dir/clusters/events.csv"
 test -s "$output_dir/clusters/clusters.csv"
 test -s "$output_dir/vertices/vertices.csv"
+test -s "$output_dir/delayed_time_histogram.png"
+test -s "$output_dir/delayed_cluster_hits.png"
 touch "$output_dir/analysis.done"
 echo "Finished: $output_dir"

@@ -30,3 +30,25 @@ def test_submit_generator_excludes_small_skims_and_can_limit_pilot(tmp_path):
     assert "arguments = $(input_path)" in submit
     assert "test\\LicketyFit_official" in submit or "test/LicketyFit_official" in submit
     assert "home-i01" not in submit
+
+
+def test_plot_backfill_handles_completed_job_without_candidates(tmp_path):
+    job = tmp_path / "mdt_e1000MeV_gamma_cyl_HD1"
+    clusters = job / "clusters"
+    clusters.mkdir(parents=True)
+    (job / "analysis.done").touch()
+    (clusters / "events.csv").write_text(
+        "input_file,event_index,primary_pid,delta_t_ns\ninput.npz,0,22,\n", encoding="utf-8"
+    )
+    (clusters / "clusters.csv").write_text(
+        "input_file,event_index,rank,n_hits,n_pmts,charge\n", encoding="utf-8"
+    )
+    script = Path(__file__).resolve().parents[1] / "scripts" / "plot_delayed_batch_results.py"
+    first = subprocess.run([sys.executable, str(script), str(tmp_path)],
+                           check=True, capture_output=True, text=True)
+    assert "Created 2 plots" in first.stdout
+    assert (job / "delayed_time_histogram.png").stat().st_size > 0
+    assert (job / "delayed_cluster_hits.png").stat().st_size > 0
+    second = subprocess.run([sys.executable, str(script), str(tmp_path)],
+                            check=True, capture_output=True, text=True)
+    assert "kept 2 existing plots" in second.stdout
