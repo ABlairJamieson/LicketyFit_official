@@ -69,8 +69,16 @@ def test_five_bin_efficiency_and_timing_match_fraction(tmp_path):
     summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
     assert summary["counts"]["truth_status"]["ambiguous_lineage"] == 1
     assert summary["counts"]["truth_decays_in_range"] == 3
+    assert summary["time_residuals"]["n_unique_truth_with_rank1"] == 2
+    assert summary["time_residuals"]["n_within_match_tolerance"] == 1
+    with (output / "events_truth_audit.csv").open(newline="", encoding="utf-8") as handle:
+        audited = list(csv.DictReader(handle))
+    assert float(audited[0]["time_residual_ns"]) == 5.0
+    assert float(audited[2]["time_residual_ns"]) == 1500.0
+    assert audited[1]["time_residual_ns"] == ""
     assert (output / "delay_bin_metrics.png").is_file()
     assert (output / "truth_muon_lifetimes.png").is_file()
+    assert (output / "time_residuals.png").is_file()
 
 
 def test_missing_truth_not_counted_as_false_candidate(tmp_path):
@@ -85,3 +93,4 @@ def test_missing_truth_not_counted_as_false_candidate(tmp_path):
     summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
     assert summary["counts"]["truth_status"]["missing_truth"] == 1
     assert summary["counts"]["reco_candidates_in_range_with_classifiable_truth"] == 0
+    assert (output / "time_residuals.png").is_file()

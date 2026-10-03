@@ -335,7 +335,15 @@ intervals are shown; empty denominators remain undefined. `events_truth_audit.cs
 records every event's classification and time difference; `summary.json`
 reports missing or ambiguous truth separately. `truth_muon_lifetimes.png`
 plots the available muon-to-positron track times against a 2.197 µs
-reference. Check the track-time and PMT-time origins, and simulation readout
+reference. `time_residuals.png` shows the **signed** rank-1 found-minus-truth
+delay for every event with unique Michel truth and a rank-1 cluster, both
+full range and zoomed around zero. `events_truth_audit.csv` includes the
+signed `time_residual_ns` and its absolute `delay_difference_ns`.
+`summary.json` reports the matched-core median and standard deviation, but
+the latter is truncated by the ±100 ns match cut and is **not** an unbiased
+detector resolution. The residual also includes prompt/primary time-origin
+differences and uncorrected photon flight times. Check the track-time and
+PMT-time origins, and simulation readout
 coverage, before treating these as detector efficiencies. `track_parent`
 encodes a parent PDG rather than a unique track ID, so events with multiple
 possible muons or positrons are excluded.

@@ -24,7 +24,7 @@ REQUIRED_TRUTH = ("track_pid", "track_parent", "track_start_time")
 EVENT_COLUMNS = (
     "input_file", "event_index", "primary_pid", "truth_status", "muon_birth_ns",
     "positron_birth_ns", "truth_lifetime_ns", "truth_delay_from_primary_ns",
-    "reco_delay_ns", "timing_matched", "delay_difference_ns",
+    "reco_delay_ns", "timing_matched", "time_residual_ns", "delay_difference_ns",
 )
 BIN_COLUMNS = (
     "bin_start_ns", "bin_end_ns", "truth_decays", "truth_matched",
@@ -128,7 +128,7 @@ def analyze(events_csv: Path, edges: np.ndarray, tolerance_ns: float, pid: int) 
                 record = {name: "" for name in EVENT_COLUMNS}
                 record.update(input_file=str(source), event_index=index, primary_pid=pid,
                               truth_status=status, reco_delay_ns=reco if reco is not None else "",
-                              timing_matched="", delay_difference_ns="")
+                              timing_matched="", time_residual_ns="", delay_difference_ns="")
                 for key in ("muon_birth_ns", "positron_birth_ns", "truth_lifetime_ns",
                             "truth_delay_from_primary_ns"):
                     if key in truth:
@@ -138,8 +138,10 @@ def analyze(events_csv: Path, edges: np.ndarray, tolerance_ns: float, pid: int) 
                 matched = False
                 if status == "unique_michel":
                     truth_delay = truth["truth_delay_from_primary_ns"]
-                    difference = abs(reco - truth_delay) if reco is not None else None
+                    residual = reco - truth_delay if reco is not None else None
+                    difference = abs(residual) if residual is not None else None
                     matched = difference is not None and difference <= tolerance_ns
+                    record["time_residual_ns"] = residual if residual is not None else ""
                     record["delay_difference_ns"] = difference if difference is not None else ""
                     lifetimes.append(truth["truth_lifetime_ns"])
                     truth_bin = bin_index(truth_delay, edges)
@@ -177,6 +179,21 @@ def analyze(events_csv: Path, edges: np.ndarray, tolerance_ns: float, pid: int) 
                   "relative to uniquely identified pion-parented mu+ / muon-parented e+ tracks; "
                   "truth_delay is relative to earliest primary track, while reconstructed delay is "
                   "relative to prompt PMT light. Check timing origins and readout coverage.",
+    }
+    all_residuals = np.asarray([row["time_residual_ns"] for row in rows
+                                if row["time_residual_ns"] != ""], dtype=float)
+    matched_residuals = all_residuals[np.abs(all_residuals) <= tolerance_ns]
+    summary["time_residuals"] = {
+        "definition": "(rank-1 cluster time - prompt PMT time) - "
+                      "(truth positron time - earliest primary track time)",
+        "n_unique_truth_with_rank1": int(all_residuals.size),
+        "n_within_match_tolerance": int(matched_residuals.size),
+        "median_ns_all_pairs": float(np.median(all_residuals)) if all_residuals.size else None,
+        "median_ns_matched": float(np.median(matched_residuals)) if matched_residuals.size else None,
+        "std_ns_matched": float(np.std(matched_residuals, ddof=1)) if matched_residuals.size > 1 else None,
+        "note": "The matched subset is cut at the stated tolerance: its width is not an "
+                "unbiased detector resolution. Residual includes different time origins and "
+                "uncorrected light travel times; far tails can be wrong rank-1 clusters.",
     }
     return rows, bins, summary, lifetimes
 
@@ -235,6 +252,40 @@ def plot_truth_lifetimes(lifetimes: list[float], output: Path) -> None:
     plt.close(fig)
 
 
+def plot_time_residuals(rows: list[dict], tolerance_ns: float, output: Path) -> None:
+    """Show all candidate/truth pairs, not only pairs passing the match cut."""
+    residuals = np.asarray([row["time_residual_ns"] for row in rows
+                            if row["time_residual_ns"] != ""], dtype=float)
+    fig, axes = plt.subplots(2, 1, figsize=(9, 7), constrained_layout=True)
+    if residuals.size:
+        extent = max(1000.0, float(np.ceil(np.max(np.abs(residuals)) / 1000.0) * 1000.0))
+        axes[0].hist(residuals, bins=np.linspace(-extent, extent, 101),
+                     color="#4c78a8", histtype="step", linewidth=1.8)
+        zoom = max(200.0, 2 * tolerance_ns)
+        axes[1].hist(residuals, bins=np.linspace(-zoom, zoom, 81),
+                     color="#4c78a8", histtype="step", linewidth=1.8)
+        for axis in axes:
+            axis.axvline(0, color="black", linewidth=0.9)
+            axis.axvline(-tolerance_ns, color="#e45756", linestyle="--", linewidth=1,
+                         label=f"±{tolerance_ns:g} ns match cut")
+            axis.axvline(tolerance_ns, color="#e45756", linestyle="--", linewidth=1)
+        axes[1].legend()
+    else:
+        for axis in axes:
+            axis.text(0.5, 0.5, "No rank-1 candidates with unique Michel truth",
+                      transform=axis.transAxes, ha="center", va="center")
+    axes[0].set(title=f"All unique-truth / rank-1 pairs (n={len(residuals)}); full range",
+                ylabel="Candidates / bin")
+    axes[1].set(title="Core close-up; includes pairs outside the match cut",
+                xlabel="Reconstructed prompt-to-cluster delay − truth primary-to-e⁺ delay (ns)",
+                ylabel="Candidates / bin")
+    for axis in axes:
+        axis.grid(alpha=0.2)
+    fig.suptitle("Delayed-cluster timing residual (different origins; no photon-TOF correction)")
+    fig.savefig(output, dpi=180)
+    plt.close(fig)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("events_csv", type=Path, help="events.csv from study_delayed_clusters.py")
@@ -262,6 +313,7 @@ def main() -> int:
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     plot_bins(bins, output / "delay_bin_metrics.png")
     plot_truth_lifetimes(lifetimes, output / "truth_muon_lifetimes.png")
+    plot_time_residuals(events, args.match_tolerance_ns, output / "time_residuals.png")
     for row in bins:
         print(f"{row['bin_start_ns']:.0f}–{row['bin_end_ns']:.0f} ns: "
               f"efficiency {row['truth_matched']}/{row['truth_decays']}; "
@@ -269,6 +321,9 @@ def main() -> int:
     if lifetimes:
         print(f"Available unique muon truth lifetimes: n={len(lifetimes)}, "
               f"mean={np.mean(lifetimes):.0f} ns (descriptive, not acceptance-corrected)")
+    residual_summary = summary["time_residuals"]
+    print(f"Timing residuals: {residual_summary['n_unique_truth_with_rank1']} rank-1/truth pairs; "
+          f"{residual_summary['n_within_match_tolerance']} within ±{args.match_tolerance_ns:g} ns")
     print(f"Results: {output}")
     return 0
 
