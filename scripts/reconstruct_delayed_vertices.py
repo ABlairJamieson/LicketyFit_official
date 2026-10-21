@@ -116,6 +116,12 @@ def main() -> int:
     output_dir = args.output_dir or args.clusters_csv.parent / "vertex_reconstruction"
     output_dir.mkdir(parents=True, exist_ok=True)
     positions = load_pmt_positions(args.mapping_file)
+    events_csv = args.clusters_csv.with_name("events.csv")
+    prompt_windows: dict[tuple[str, str], dict[str, str]] = {}
+    if events_csv.is_file():
+        with events_csv.open(newline="", encoding="utf-8") as handle:
+            for event_row in csv.DictReader(handle):
+                prompt_windows[(event_row["input_file"], event_row["event_index"])] = event_row
     by_file: dict[Path, list[dict]] = defaultdict(list)
     with args.clusters_csv.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
@@ -171,6 +177,34 @@ def main() -> int:
                                residual_rms_ns=float(fit["residual_rms_ns"]),
                                converged=bool(fit["converged"]),
                                linear_rank=int(fit["linear_rank"]))
+                    # Fit the prompt cluster with the same earliest-per-PMT
+                    # multilateration estimator so its t0 can be differenced
+                    # from the delayed-cluster t0 on the same event clock.
+                    prompt_row = prompt_windows.get((str(source), str(index)))
+                    if prompt_row and prompt_row.get("prompt_start_ns") and prompt_row.get("prompt_end_ns"):
+                        prompt_mask = (np.isfinite(times) & (times >= args.min_time_ns)
+                                       & (times >= float(prompt_row["prompt_start_ns"]))
+                                       & (times <= float(prompt_row["prompt_end_ns"]))
+                                       & np.isfinite(charges) & (charges > 0))
+                        prompt_matched = np.array(
+                            [int(pmt) in positions for pmt in pmts[prompt_mask]], dtype=bool)
+                        prompt_ids = pmts[prompt_mask][prompt_matched]
+                        prompt_times = times[prompt_mask][prompt_matched]
+                        prompt_charges = charges[prompt_mask][prompt_matched]
+                        prompt_positions = np.asarray(
+                            [positions[int(pmt)] for pmt in prompt_ids], dtype=float).reshape(-1, 3)
+                        try:
+                            prompt_fit = fit_delayed_point_vertex(
+                                prompt_positions, prompt_ids, prompt_charges, prompt_times,
+                                min_pmts=args.min_pmts)
+                            row.update(prompt_t0_ns=float(prompt_fit["t0_ns"]),
+                                       prompt_residual_rms_ns=float(prompt_fit["residual_rms_ns"]),
+                                       fitted_delta_t_ns=float(fit["t0_ns"] - prompt_fit["t0_ns"]),
+                                       prompt_n_fit_pmts=int(prompt_fit["n_selected_pmts"]))
+                        except (ValueError, RuntimeError) as prompt_exc:
+                            row["prompt_fit_error"] = str(prompt_exc)
+                    else:
+                        row["prompt_fit_error"] = "Prompt window bounds unavailable; rerun study_delayed_clusters.py"
                     truth = match_michel_truth(event, row["delta_t_ns"],
                                                tolerance_ns=args.truth_match_tolerance_ns)
                     row["truth_status"] = truth["status"]
@@ -194,7 +228,9 @@ def main() -> int:
     columns = ("input_file", "event_index", "primary_pid", "delta_t_ns", "cluster_n_hits",
                "cluster_n_pmts", "cluster_charge", "status", "error", "time_mode",
                "n_mapped_pmts", "n_fit_pmts", "x_mm", "y_mm", "z_mm",
-               "r_tank_mm", "t0_ns", "residual_rms_ns",
+               "r_tank_mm", "t0_ns", "residual_rms_ns", "prompt_t0_ns",
+               "prompt_residual_rms_ns", "fitted_delta_t_ns", "prompt_n_fit_pmts",
+               "prompt_fit_error",
                "converged", "linear_rank", "truth_status", "n_truth_candidates",
                "truth_track_index", "truth_pdg", "truth_delay_ns",
                "truth_delay_difference_ns", "truth_x_mm", "truth_y_mm", "truth_z_mm",

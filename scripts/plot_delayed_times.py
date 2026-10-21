@@ -83,6 +83,8 @@ def main() -> int:
     parser.add_argument("--fit-min-ns", type=float, default=500.0)
     parser.add_argument("--fit-pid", default="211", help="Primary PID to fit (default: pi+)")
     parser.add_argument("--no-fit", action="store_true", help="Plot without fitting a delay model")
+    parser.add_argument("--vertex-csv", type=Path, default=None,
+                        help="Optional vertices.csv; overlay prompt-to-delayed fitted emission-time differences")
     args = parser.parse_args()
     if args.bins < 1 or args.max_ns <= args.min_ns:
         parser.error("Require --bins >= 1 and --max-ns > --min-ns")
@@ -101,6 +103,27 @@ def main() -> int:
                 if np.isfinite(delay):
                     delays[particle].append(delay)
 
+    fitted_delays: dict[str, list[float]] = defaultdict(list)
+    fitted_residuals: dict[str, list[float]] = defaultdict(list)
+    if args.vertex_csv is not None:
+        with args.vertex_csv.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                if row.get("status") != "ok" or not row.get("fitted_delta_t_ns"):
+                    continue
+                try:
+                    value = float(row["fitted_delta_t_ns"])
+                except (TypeError, ValueError):
+                    continue
+                if np.isfinite(value):
+                    particle = row.get("primary_pid", "unknown")
+                    fitted_delays[particle].append(value)
+                    try:
+                        truth_delay = float(row.get("truth_delay_ns", ""))
+                    except (TypeError, ValueError):
+                        truth_delay = np.nan
+                    if row.get("truth_status") == "matched" and np.isfinite(truth_delay):
+                        fitted_residuals[particle].append(value - truth_delay)
+
     if not totals:
         raise ValueError("The event table is empty")
     edges = np.linspace(args.min_ns, args.max_ns, args.bins + 1)
@@ -109,11 +132,20 @@ def main() -> int:
     for axis, particle in zip(axes[:, 0], groups):
         values = np.asarray(delays[particle])
         counts, _ = np.histogram(values, bins=edges)
-        axis.stairs(counts, edges, linewidth=1.8, color=PARTICLE_COLORS.get(particle, "#555555"))
+        color = PARTICLE_COLORS.get(particle, "#555555")
+        axis.stairs(counts, edges, linewidth=1.8, color=color,
+                    label=f"Window-center delay (n={len(values):,})")
+        fit_times = np.asarray(fitted_delays.get(particle, []), dtype=float)
+        fit_counts, _ = np.histogram(fit_times, bins=edges)
+        if fit_times.size:
+            axis.stairs(fit_counts, edges, linewidth=1.8, linestyle="-.", color="black",
+                        label=f"Vertex-fit emission-time difference (n={len(fit_times):,})")
         axis.set_ylabel(f"Events / {(args.max_ns - args.min_ns) / args.bins:g} ns")
         axis.grid(alpha=0.2)
         label = PARTICLE_LABELS.get(particle, particle)
-        axis.set_title(f"{label}: {len(values)}/{totals[particle]} with a delayed candidate; {counts.sum()} in plotted range", loc="left", fontsize=11)
+        axis.set_title(f"MC — {label}: {len(values)}/{totals[particle]} with a delayed candidate; {counts.sum()} in plotted range", loc="left", fontsize=11)
+        if fit_times.size:
+            axis.legend(loc="upper right", fontsize=8)
         print(f"{particle}: {totals[particle]} events, {len(values)} candidates, {counts.sum()} in range")
         if not args.no_fit and particle == args.fit_pid:
             fit = fit_delay_model(values, args.fit_min_ns, args.max_ns)
@@ -133,14 +165,40 @@ def main() -> int:
             axis.legend(loc="upper right")
             print(f"Apparent delay constant for PID {particle}: {fit['tau_ns']:.0f} ns{interval}; "
                   f"signal fraction={fit['signal_fraction']:.3f}; n={fit['n_fit']}")
-    axes[-1, 0].set_xlabel("Rank-1 delayed-cluster time minus prompt-cluster time (ns)")
+    axes[-1, 0].set_xlabel("Delayed minus prompt time (window-center or vertex-fit emission time; ns)")
     axes[-1, 0].set_xlim(args.min_ns, args.max_ns)
-    fig.suptitle("Delayed hit-cluster candidates (rank 1: most distinct PMTs, charge tie-break)", fontsize=13)
+    fig.suptitle("MC delayed hit-cluster candidates (rank 1: most distinct PMTs, charge tie-break)", fontsize=13)
     fig.tight_layout()
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=180)
     plt.close(fig)
     print(f"Plot: {output}")
+    if fitted_residuals:
+        residual_output = output.with_name("vertex_fit_time_residuals.png")
+        residual_edges = np.linspace(-1000.0, 1000.0, 81)
+        residual_groups = sorted(fitted_residuals,
+                                 key=lambda key: (key not in PARTICLE_LABELS, key))
+        residual_fig, residual_axes = plt.subplots(
+            len(residual_groups), 1,
+            figsize=(9, max(3.3, 2.8 * len(residual_groups))),
+            sharex=True, squeeze=False)
+        for axis, particle in zip(residual_axes[:, 0], residual_groups):
+            values = np.asarray(fitted_residuals[particle], dtype=float)
+            axis.hist(values, bins=residual_edges, histtype="step", linewidth=1.8,
+                      color=PARTICLE_COLORS.get(particle, "#555555"))
+            axis.axvline(0.0, color="black", linewidth=1)
+            axis.set_ylabel("Candidates / bin")
+            axis.set_title(f"MC — {PARTICLE_LABELS.get(particle, particle)}: n={len(values):,}; "
+                           f"median={np.median(values):.1f} ns; RMS={np.sqrt(np.mean(values**2)):.1f} ns",
+                           loc="left", fontsize=10)
+            axis.grid(alpha=0.2)
+        residual_axes[-1, 0].set_xlabel("(Delayed fitted t0 − prompt fitted t0) − truth Michel delay (ns)")
+        residual_axes[-1, 0].set_xlim(-1000, 1000)
+        residual_fig.suptitle("MC vertex-fit timing residuals (time-matched Michel truth)", fontsize=13)
+        residual_fig.tight_layout()
+        residual_fig.savefig(residual_output, dpi=180)
+        plt.close(residual_fig)
+        print(f"Plot: {residual_output}")
     return 0
 
 

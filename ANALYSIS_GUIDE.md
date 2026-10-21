@@ -436,6 +436,25 @@ differences; `reco_truth_distance_3d_mm` gives the actual three-dimensional
 distance. These point-source estimates can be biased by the electron's finite
 track; no containment or reconstruction-quality cut is applied yet.
 
+The vertex reconstruction also fits the prompt cluster with the same
+earliest-hit-per-PMT multilateration seed used for delayed clusters. It stores
+`prompt_t0_ns` and `fitted_delta_t_ns = delayed_t0_ns - prompt_t0_ns` in
+`vertices.csv`. To compare fitted emission-time differences with the existing
+window-center delays, pass that CSV to the delay plotter:
+
+```bash
+python3 scripts/plot_delayed_times.py \
+  outputs/delayed_pion_pilot_v3/events.csv \
+  --vertex-csv outputs/delayed_pion_pilot_v3/vertices_all/vertices.csv \
+  --no-fit
+```
+
+This overlays both raw-count distributions; only candidates with successful
+prompt and delayed fits contribute to the vertex-fit curve. The fit remains
+an effective light-origin timing estimate, not yet a validated decay-time
+resolution. Rerun `study_delayed_clusters.py` before vertex reconstruction if
+the existing event table lacks `prompt_start_ns` and `prompt_end_ns`.
+
 The vertex run also writes `delayed_vertex_residuals_xyz.png`: three signed
 histograms of reconstructed minus matched-truth `x`, `y`, and `z` in cm. Each
 panel reports its median and RMS. Only successfully fitted, time-matched

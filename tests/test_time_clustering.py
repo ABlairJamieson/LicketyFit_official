@@ -77,6 +77,7 @@ def test_cli_reads_datatools_style_npz(tmp_path):
     assert row["n_rejected_early_digits"] == "1"
     assert row["n_delayed_clusters"] == "1"
     assert row["prompt_n_hits"] == "12"
+    assert float(row["prompt_start_ns"]) < float(row["prompt_end_ns"])
     assert 2190 < float(row["delta_t_ns"]) < 2210
 
 
