@@ -295,8 +295,13 @@ muon decay, not by itself proof that a pion was produced. Confirm that WCSim
 retained hits over the intended delayed search interval before using the
 absence of a candidate as a negative tag.
 
-Plot the strongest delayed candidate per event using 30 bins between 100
-and 6100 ns (200 ns per bin), with separate panels for pi+ and pi-:
+The existing rank-1 candidate is selected by a specific rule: after locating
+the prompt burst, the finder repeatedly takes the densest remaining 50 ns
+window by **number of distinct PMTs**, breaking ties by total charge. It
+suppresses nearby overlapping windows and stores up to five candidates. The
+first of these is rank 1; it is not simply the second burst in time and is not
+chosen by digit-hit count. Plot it using 30 bins between 100 and 6100 ns
+(200 ns per bin), with separate panels for pi+ and pi-:
 
 ```bash
 python3 scripts/plot_delayed_times.py \
@@ -313,6 +318,28 @@ result is an *apparent* delay constant until the trigger/readout efficiency
 versus delay and non-Michel backgrounds are measured. Pass `--bins 60` for
 100 ns bins, `--fit-min-ns` to adjust the fitted interval, or `--no-fit` to
 show the histograms alone.
+
+To compare that rank-1 choice against simpler alternatives—the earliest
+delayed cluster (the next cluster in time after prompt) and the delayed
+cluster with the most digit hits—plot all three from the same study output:
+
+```bash
+python3 scripts/plot_delayed_time_choices.py \
+  outputs/delayed_pion_pilot_v3/events.csv \
+  --output outputs/delayed_pion_pilot_v3/delayed_time_selection_comparison.png
+```
+
+This is a raw-count comparison with no lifetime fit. It uses `clusters.csv`
+next to `events.csv`; the displayed labels state each rule explicitly. The
+same command also writes basic WCSim QA plots beside the CSVs:
+`clusters_per_event.png`, `cluster_hits_all_prompt_delayed.png`, and
+`prompt_and_delayed_cluster_times.png`. The cluster-size figure separates the
+prompt cluster, delayed candidates, and their combined distribution. The
+prompt-time panel uses the recorded event time convention; the delayed-time
+panel is candidate-center minus prompt-center. These are the WCSim
+time-clustering outputs, not the ROOT-data burst-finding algorithm. If using
+older `events.csv` files without `prompt_n_hits`, rerun
+`study_delayed_clusters.py` first so the prompt-cluster hit counts are saved.
 
 For the five-bin, 1000–6100 ns follow-up, audit the *same rank-1 candidates*
 against the WCSim pion → muon → positron track times:

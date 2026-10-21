@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot prompt-to-best-delayed-cluster times from study_delayed_clusters.py."""
+"""Plot prompt-to-rank-1 delayed-cluster times from study_delayed_clusters.py."""
 
 from __future__ import annotations
 
@@ -133,9 +133,9 @@ def main() -> int:
             axis.legend(loc="upper right")
             print(f"Apparent delay constant for PID {particle}: {fit['tau_ns']:.0f} ns{interval}; "
                   f"signal fraction={fit['signal_fraction']:.3f}; n={fit['n_fit']}")
-    axes[-1, 0].set_xlabel("Best delayed-cluster time minus prompt-cluster time (ns)")
+    axes[-1, 0].set_xlabel("Rank-1 delayed-cluster time minus prompt-cluster time (ns)")
     axes[-1, 0].set_xlim(args.min_ns, args.max_ns)
-    fig.suptitle("Delayed hit-cluster candidates", fontsize=13)
+    fig.suptitle("Delayed hit-cluster candidates (rank 1: most distinct PMTs, charge tie-break)", fontsize=13)
     fig.tight_layout()
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=180)

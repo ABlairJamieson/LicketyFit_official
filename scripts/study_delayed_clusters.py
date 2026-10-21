@@ -49,7 +49,7 @@ def main() -> int:
     event_fields = [
         "input_file", "event_index", "event_id", "primary_pid", "selection_category",
         "time_mode", "n_digits", "n_rejected_early_digits", "n_triggers", "time_span_ns", "prompt_time_ns",
-        "prompt_pmts", "prompt_charge", "n_delayed_clusters", "best_delayed_time_ns",
+        "prompt_pmts", "prompt_n_hits", "prompt_charge", "n_delayed_clusters", "best_delayed_time_ns",
         "delta_t_ns", "best_delayed_pmts", "best_delayed_charge",
     ]
     cluster_fields = ["input_file", "event_index", "rank", "delta_t_ns", "start_ns", "end_ns", "center_ns", "n_hits", "n_pmts", "charge"]
@@ -97,6 +97,7 @@ def main() -> int:
                         "time_span_ns": float(np.ptp(times)) if len(times) else "",
                         "prompt_time_ns": prompt.center_ns if prompt else "",
                         "prompt_pmts": prompt.n_pmts if prompt else "",
+                        "prompt_n_hits": prompt.n_hits if prompt else "",
                         "prompt_charge": prompt.charge if prompt else "",
                         "n_delayed_clusters": len(delayed),
                         "best_delayed_time_ns": best.center_ns if best else "",
